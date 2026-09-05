@@ -1,0 +1,392 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daftar Akun SIPIBS - Sistem Peminjaman & Inventaris Barang Sekolah</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background-color: #eaf2fa;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+            color: #1e293b;
+        }
+
+        .card-container {
+            width: 100%;
+            max-width: 430px;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(2, 43, 105, 0.08);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-inner {
+            background: #ffffff;
+            border-radius: 16px;
+        }
+
+        .card-header-section {
+            padding: 32px 24px 12px 24px;
+            text-align: center;
+        }
+
+        .logo-wrapper {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            background: #f0f6fc;
+            border-radius: 10px;
+            margin-bottom: 16px;
+        }
+
+        .logo-badge {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #00337c;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0, 51, 124, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+        }
+
+        .title {
+            font-size: 21px;
+            font-weight: 800;
+            color: #00337c;
+            margin-bottom: 6px;
+            letter-spacing: -0.2px;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            font-weight: 500;
+            color: #5a6b82;
+            line-height: 1.4;
+        }
+
+        .card-body-section {
+            padding: 20px 28px 28px 28px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 800;
+            color: #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 6px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            color: #64748b;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .form-input {
+            width: 100%;
+            height: 42px;
+            padding: 8px 14px 8px 42px;
+            background-color: #f1f6fb;
+            border: 1px solid #d0dfed;
+            border-radius: 8px;
+            font-size: 13.5px;
+            color: #1e293b;
+            font-weight: 500;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .form-input::placeholder {
+            color: #8a99ad;
+            font-weight: 400;
+        }
+
+        .form-input:focus {
+            background-color: #ffffff;
+            border-color: #00337c;
+            box-shadow: 0 0 0 3px rgba(0, 51, 124, 0.1);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-top: 16px;
+            margin-bottom: 22px;
+            cursor: pointer;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+            margin-top: 2px;
+            background-color: #ffffff;
+            display: grid;
+            place-content: center;
+            flex-shrink: 0;
+            transition: all 0.15s ease;
+        }
+
+        .checkbox-container input[type="checkbox"]:checked {
+            background-color: #00337c;
+            border-color: #00337c;
+        }
+
+        .checkbox-container input[type="checkbox"]:checked::before {
+            content: "\F26E";
+            font-family: "bootstrap-icons";
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .checkbox-label {
+            font-size: 11.5px;
+            line-height: 1.45;
+            color: #475569;
+            font-weight: 500;
+            user-select: none;
+        }
+
+        .checkbox-label a {
+            color: #00337c;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .checkbox-label a:hover {
+            text-decoration: underline;
+        }
+
+        .btn-submit {
+            width: 100%;
+            height: 44px;
+            background-color: #00337c;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            font-size: 14.5px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 4px 10px rgba(0, 51, 124, 0.2);
+        }
+
+        .btn-submit:hover {
+            background-color: #002257;
+        }
+
+        .btn-submit:active {
+            transform: scale(0.99);
+        }
+
+        .btn-submit i {
+            font-size: 15px;
+        }
+
+        .footer-divider {
+            height: 1px;
+            background-color: #e2e8f0;
+            margin: 20px 0 16px 0;
+        }
+
+        .footer-text {
+            text-align: center;
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .btn-login-wrapper {
+            text-align: center;
+        }
+
+        .btn-login {
+            display: inline-block;
+            padding: 6px 36px;
+            border: 1px solid #cbd5e1;
+            border-radius: 20px;
+            color: #00337c;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            background-color: #ffffff;
+        }
+
+        .btn-login:hover {
+            border-color: #00337c;
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card-container">
+        <div class="card-inner">
+            <!-- Header Section -->
+            <div class="card-header-section">
+                <div class="logo-wrapper">
+                    <div class="logo-badge">
+                        <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Outer Ring -->
+                            <circle cx="50" cy="50" r="46" stroke="#FFFFFF" stroke-width="3" fill="#00337C"/>
+                            <circle cx="50" cy="50" r="41" stroke="#38BDF8" stroke-width="1.5" stroke-dasharray="3 2"/>
+                            <!-- School Building Logo Graphic -->
+                            <path d="M50 22 L72 34 V42 H28 V34 L50 22 Z" fill="#FFFFFF"/>
+                            <rect x="33" y="45" width="34" height="28" rx="2" fill="#FFFFFF"/>
+                            <rect x="44" y="55" width="12" height="18" fill="#00337C"/>
+                            <circle cx="50" cy="34" r="4" fill="#00337C"/>
+                            <!-- Stars -->
+                            <polygon points="26,26 28,30 32,30 29,33 30,37 26,34 22,37 23,33 20,30 24,30" fill="#FDBA74"/>
+                            <polygon points="74,26 76,30 80,30 77,33 78,37 74,34 70,37 71,33 68,30 72,30" fill="#FDBA74"/>
+                        </svg>
+                    </div>
+                </div>
+                <h1 class="title">Daftar Akun SIPIBS</h1>
+                <p class="subtitle">Sistem Peminjaman & Inventaris Barang Sekolah</p>
+            </div>
+
+            <!-- Form Section -->
+            <div class="card-body-section">
+                <form action="#" method="POST" onsubmit="event.preventDefault();">
+                    <input type="hidden" name="_token" value="" autocomplete="off">                    
+                    <!-- Nama Lengkap -->
+                    <div class="form-group">
+                        <label class="form-label" for="name">Nama Lengkap</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">
+                                <i class="bi bi-person"></i>
+                            </span>
+                            <input type="text" id="name" name="name" class="form-input" placeholder="Nama Lengkap" required>
+                        </div>
+                    </div>
+
+                    <!-- NIS / NIP -->
+                    <div class="form-group">
+                        <label class="form-label" for="identity_number">NIS / NIP</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">
+                                <i class="bi bi-card-heading"></i>
+                            </span>
+                            <input type="text" id="identity_number" name="identity_number" class="form-input" placeholder="Nomor Induk Siswa/Pegawai" required>
+                        </div>
+                    </div>
+
+                    <!-- Alamat Email -->
+                    <div class="form-group">
+                        <label class="form-label" for="email">Alamat Email</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">
+                                <i class="bi bi-envelope"></i>
+                            </span>
+                            <input type="email" id="email" name="email" class="form-input" placeholder="Email@gmail.com" required>
+                        </div>
+                    </div>
+
+                    <!-- Kata Sandi & Konfirmasi -->
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label" for="password">Kata Sandi</label>
+                            <div class="input-wrapper">
+                                <span class="input-icon">
+                                    <i class="bi bi-lock"></i>
+                                </span>
+                                <input type="password" id="password" name="password" class="form-input" placeholder="********" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="password_confirmation">Konfirmasi</label>
+                            <div class="input-wrapper">
+                                <span class="input-icon">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </span>
+                                <input type="password" id="password_confirmation" name="password_confirmation" class="form-input" placeholder="********" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Terms Checkbox -->
+                    <label class="checkbox-container">
+                        <input type="checkbox" name="terms" required>
+                        <span class="checkbox-label">
+                            Saya menyetujui <a href="#">Syarat & Ketentuan</a> penggunaan sistem inventaris sekolah.
+                        </span>
+                    </label>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn-submit">
+                        Register <i class="bi bi-arrow-right"></i>
+                    </button>
+
+                    <div class="footer-divider"></div>
+
+                    <!-- Already have account -->
+                    <div class="footer-text">Sudah memiliki akun?</div>
+                    <div class="btn-login-wrapper">
+                        <a href="#" class="btn-login">Masuk</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
