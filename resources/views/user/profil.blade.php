@@ -9,11 +9,97 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="{{ asset('css/sipibs-ui.css') }}?v=25">
+    <style>.user-sidebar + .main-area .user-profile-content .profile-field.password-field { grid-template-columns: 34px minmax(0, 1fr) 42px !important; }.password-toggle { border: 0; background: transparent; color: #52627a; cursor: pointer; font-size: 16px; height: 48px; padding: 0; }.password-toggle i { display: block; }.password-toggle:hover { color: #0d4d99; }</style>
 </head>
 <body class="{{ ($showLogout ?? false) ? 'user-logout-page' : '' }}">
+@include('user.partials.local-storage-cleanup')
 @php
-    $userName = Auth::check() ? Auth::user()->name : 'Rizky Pratama';
-    $userEmail = Auth::check() ? Auth::user()->email : 'rizky.pratama@email.com';
+    $user = Auth::user();
+    $userName = $user ? $user->name : 'Rizky Pratama';
+    $userEmail = $user ? $user->email : 'rizky.pratama@email.com';
+    $userClass = $user ? $user->class_name : null;
+    $userNis = Auth::check() ? $user->identity_number : null;
+    $userIdentityDocument = $user ? $user->identity_document : null;
+    $userBirthdate = $user ? $user->birth_date : null;
+        $userGender = $user ? $user->gender : null;
+    $userRole = ($user && $user->role === 'guru') ? 'Guru' : 'Siswa';
+    $userPhoto = ($user && $user->photo) ? $user->photo : asset('images/PROFIL.png');
+    $userRoleUpper = strtoupper($userRole);
+    $bulanIndo = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+    ];
+    $userCreatedAt = ($user && $user->created_at)
+        ? $user->created_at->format('j') . ' ' . ($bulanIndo[(int)$user->created_at->format('n')] ?? '') . ' ' . $user->created_at->format('Y')
+        : '15 Januari 2024';
+    $userBorrowings = \App\Models\Borrowing::where('user_id', Auth::id())->get();
+    $totalBorrowings = $userBorrowings->count();
+    $activeBorrowings = $userBorrowings->whereIn('status', ['menunggu', 'disetujui', 'dipinjam'])->count();
+    $completedBorrowings = $userBorrowings->where('status', 'dikembalikan')->count();
+    $lateBorrowings = $userBorrowings->filter(function ($b) {
+        if ($b->status === 'terlambat') return true;
+        if (in_array($b->status, ['menunggu', 'disetujui', 'dipinjam']) && $b->due_date && $b->due_date->isPast()) return true;
+        return false;
+    })->count();
+
+    $recentActivities = collect();
+    $userReturns = \App\Models\ReturnRecord::with('borrowing.item')
+        ->where('user_id', Auth::id())
+        ->orWhereHas('borrowing', fn($q) => $q->where('user_id', Auth::id()))
+        ->orderByDesc('id')
+        ->get();
+
+    foreach ($userReturns as $ret) {
+        $retDate = $ret->return_date ?: $ret->created_at;
+        $title = $ret->status === 'diterima' ? 'Barang dikembalikan' : ($ret->status === 'bermasalah' ? 'Pengembalian bermasalah' : 'Menunggu verifikasi');
+        $badge = $ret->status === 'diterima' ? 'green' : ($ret->status === 'bermasalah' ? 'red' : 'orange');
+        $icon = $ret->status === 'diterima' ? 'bi-clipboard-check' : ($ret->status === 'bermasalah' ? 'bi-exclamation-triangle' : 'bi-three-dots');
+        $recentActivities->push([
+            'title' => $title,
+            'item' => $ret->item_name ?: optional(optional($ret->borrowing)->item)->name ?: 'Barang',
+            'date' => $retDate ? $retDate->format('j M') . '<br>' . $retDate->format('Y') : '-',
+            'sort_date' => $ret->created_at ?: now(),
+            'badge' => $badge,
+            'icon' => $icon,
+        ]);
+    }
+
+    foreach ($userBorrowings as $bor) {
+        if ($bor->status === 'dikembalikan' && $userReturns->where('borrowing_id', $bor->id)->count() > 0) {
+            continue;
+        }
+        $bDate = $bor->borrow_date ?: $bor->created_at;
+        $title = match ($bor->status) {
+            'dipinjam' => 'Peminjaman sedang aktif',
+            'disetujui' => 'Peminjaman disetujui',
+            'dikembalikan' => 'Barang dikembalikan',
+            'terlambat' => 'Keterlambatan pengembalian',
+            'ditolak' => 'Peminjaman ditolak',
+            default => 'Menunggu persetujuan',
+        };
+        $badge = match ($bor->status) {
+            'dipinjam', 'disetujui' => 'blue',
+            'dikembalikan' => 'green',
+            'terlambat', 'ditolak' => 'red',
+            default => 'orange',
+        };
+        $icon = match ($bor->status) {
+            'dipinjam', 'disetujui' => 'bi-check2-circle',
+            'dikembalikan' => 'bi-clipboard-check',
+            'terlambat', 'ditolak' => 'bi-exclamation-triangle',
+            default => 'bi-three-dots',
+        };
+        $recentActivities->push([
+            'title' => $title,
+            'item' => optional($bor->item)->name ?: 'Barang',
+            'date' => $bDate ? $bDate->format('j M') . '<br>' . $bDate->format('Y') : '-',
+            'sort_date' => $bor->created_at ?: now(),
+            'badge' => $badge,
+            'icon' => $icon,
+        ]);
+    }
+    $recentActivities = $recentActivities->sortByDesc('sort_date')->values();
 @endphp
 <div class="app-shell">
     <aside class="sidebar user-sidebar">
@@ -46,8 +132,8 @@
                 @include('user.partials.notification-bell')
 
                 <div class="top-user">
-                    <div><strong id="top-user-name">{{ $userName }}</strong><span>SISWA</span></div>
-                    <img class="top-avatar" id="top-avatar" src="{{ asset('images/PROFIL.png') }}" alt="Avatar">
+                    <div><strong id="top-user-name">{{ $userName }}</strong><span id="top-user-role">{{ $userRoleUpper }}</span></div>
+                    <img class="top-avatar" id="top-avatar" src="{{ $userPhoto }}" alt="Avatar">
                 </div>
             </div>
         </header>
@@ -60,18 +146,18 @@
 
             <div class="profile-hero-card">
                 <div class="profile-photo-wrap">
-                    <img id="profile-photo" src="{{ asset('images/PROFIL.png') }}" alt="Foto Profil">
+                    <img id="profile-photo" src="{{ $userPhoto }}" alt="Foto Profil">
                     <label class="profile-camera-btn" for="profile-photo-input"><i class="bi bi-camera-fill"></i></label>
-                    <input id="profile-photo-input" type="file" accept="image/*" hidden>
+                    <input id="profile-photo-input" type="file" accept="image/jpeg,image/png,image/webp" hidden>
                 </div>
                 <div class="profile-hero-info">
                     <div class="profile-name-row">
                         <h2 id="hero-name">{{ $userName }}</h2>
-                        <span>Siswa</span>
+                        <span>{{ $userRole }}</span>
                     </div>
                     <div class="profile-contact-grid">
                         <div><i class="bi bi-envelope"></i> <span id="hero-email">{{ $userEmail }}</span></div>
-                        <div><i class="bi bi-calendar2"></i> Bergabung sejak 15 Januari 2024</div>
+                        <div><i class="bi bi-calendar2"></i> Bergabung sejak {{ $userCreatedAt }}</div>
                     </div>
                 </div>
                 <div class="profile-quote-card">"Gunakan fasilitas sekolah dengan bijak<br>dan bertanggung jawab."</div>
@@ -80,47 +166,54 @@
             <div class="profile-layout-grid">
                 <div>
                     <div class="profile-tabs-user">
-                        <button class="active" type="button" data-tab="personal">Informasi Pribadi</button>
+                        <button class="active" type="button" data-tab="personal" disabled>Informasi Pribadi</button>
                         <button type="button" data-tab="security">Keamanan Akun</button>
                         <button type="button" data-tab="notifications">Pengaturan Notifikasi</button>
                     </div>
 
                     <form class="profile-form-card" id="profile-form">
+                        @csrf
                         <div class="profile-tab-panel active" id="tab-personal">
                             <div class="profile-form-grid">
                                 <label>Nama Lengkap
-                                    <div class="profile-field"><i class="bi bi-person"></i><input id="input-name" value="{{ $userName }}"></div>
+                                    <div class="profile-field"><i class="bi bi-person"></i><input disabled id="input-name" value="{{ $userName }}" readonly></div>
                                 </label>
                                 <label>Email
-                                    <div class="profile-field"><i class="bi bi-envelope"></i><input id="input-email" value="{{ $userEmail }}"></div>
+                                    <div class="profile-field"><i class="bi bi-envelope"></i><input disabled id="input-email" value="{{ $userEmail }}" readonly></div>
                                 </label>
-                                <label>Kelas
-                                    <div class="profile-field"><i class="bi bi-mortarboard"></i><input id="input-class" value="XI IPA 1"></div>
+                                <label>Kelas / Ruangan
+                                    <div class="profile-field"><i class="bi bi-mortarboard"></i><input disabled id="input-class" value="{{ $userClass ?? '' }}"></div>
                                 </label>
-                                <label>NIS
-                                    <div class="profile-field"><i class="bi bi-card-text"></i><input id="input-nis" value="1234567890"></div>
+                                <label>NIS / NIP
+                                    <div class="profile-field"><i class="bi bi-card-text"></i><input disabled id="input-nis" value="{{ $userNis ?? '' }}"></div>
                                 </label>
                                 <label>Tanggal Lahir
-                                    <div class="profile-field"><i class="bi bi-calendar3"></i><input id="input-birthdate" value="15/08/2007"></div>
+                                    <div class="profile-field"><i class="bi bi-calendar3"></i><input disabled id="input-birthdate" value="{{ $userBirthdate ?? '' }}"></div>
                                 </label>
                                 <label>Jenis Kelamin
-                                    <div class="profile-field"><i class="bi bi-gender-male"></i><select id="input-gender"><option>Laki-laki</option><option>Perempuan</option></select></div>
+                                    <div class="profile-field"><i class="bi bi-gender-male"></i><select disabled id="input-gender"><option value="Laki-laki" {{ ($userGender ?? '') === 'Laki-laki' ? 'selected' : '' }}>Laki-laki</option><option value="Perempuan" {{ ($userGender ?? '') === 'Perempuan' ? 'selected' : '' }}>Perempuan</option></select></div>
+                                </label>
+                                <label>KTP / Kartu Pelajar
+                                    <div class="profile-field identity-document-field">
+                                        <i class="bi bi-file-earmark-person"></i>
+                                        <span id="identity-doc-text">{{ $userIdentityDocument ? 'Dokumen terupload' : 'Belum diupload' }}</span>
+                                        <a id="identity-document-link" href="{{ $userIdentityDocument ?: '#' }}" style="{{ $userIdentityDocument ? '' : 'display:none;' }}">Lihat</a>
+                                    </div>
                                 </label>
                             </div>
                         </div>
-
                         <div class="profile-tab-panel" id="tab-security">
                             <h3>Keamanan Akun</h3>
                             <p>Perbarui password dan opsi keamanan akun Anda.</p>
                             <div class="profile-form-grid">
                                 <label>Password Lama
-                                    <div class="profile-field"><i class="bi bi-lock"></i><input type="password" placeholder="Masukkan password lama"></div>
+                                    <div class="profile-field password-field"><i class="bi bi-lock"></i><input id="current-password" name="current_password" type="password" placeholder="Masukkan password lama"><button type="button" class="password-toggle" data-password-target="current-password" aria-label="Tampilkan password"><i class="bi bi-eye"></i></button></div>
                                 </label>
                                 <label>Password Baru
-                                    <div class="profile-field"><i class="bi bi-shield-lock"></i><input type="password" placeholder="Masukkan password baru"></div>
+                                    <div class="profile-field password-field"><i class="bi bi-shield-lock"></i><input id="new-password" name="password" type="password" placeholder="Masukkan password baru"><button type="button" class="password-toggle" data-password-target="new-password" aria-label="Tampilkan password"><i class="bi bi-eye"></i></button></div>
                                 </label>
                                 <label>Konfirmasi Password Baru
-                                    <div class="profile-field"><i class="bi bi-check2-circle"></i><input type="password" placeholder="Ulangi password baru"></div>
+                                    <div class="profile-field password-field"><i class="bi bi-check2-circle"></i><input id="new-password-confirmation" name="password_confirmation" type="password" placeholder="Ulangi password baru"><button type="button" class="password-toggle" data-password-target="new-password-confirmation" aria-label="Tampilkan password"><i class="bi bi-eye"></i></button></div>
                                 </label>
                                 <label>Verifikasi Login
                                     <div class="profile-field"><i class="bi bi-phone"></i><select><option>Aktif - OTP Email</option><option>Nonaktif</option></select></div>
@@ -129,6 +222,9 @@
                             <div class="security-options">
                                 <label><input type="checkbox" checked> Kirim notifikasi jika ada login baru.</label>
                                 <label><input type="checkbox" checked> Keluar otomatis dari perangkat lama setelah ganti password.</label>
+                            </div>
+                            <div class="profile-save-row">
+                                <button id="password-save" type="button"><i class="bi bi-shield-check"></i> Ubah Password</button>
                             </div>
                         </div>
 
@@ -144,7 +240,7 @@
                         </div>
 
                         <div class="profile-save-row">
-                            <button type="submit"><i class="bi bi-floppy"></i> Simpan Perubahan</button>
+                            <button type="submit" style="display:none;"><i class="bi bi-floppy"></i> Simpan Perubahan</button>
                         </div>
                     </form>
                 </div>
@@ -152,21 +248,22 @@
                 <aside class="profile-side-stack">
                     <div class="profile-side-card">
                         <h3>Ringkasan Akun</h3>
-                        <div class="summary-item"><span class="blue"><i class="bi bi-clipboard-check"></i></span><div><strong>Total Peminjaman</strong><small>Semua waktu</small></div><b>0</b></div>
-                        <div class="summary-item"><span class="light-blue"><i class="bi bi-clock"></i></span><div><strong>Peminjaman Aktif</strong><small>Sedang dipinjam</small></div><b>0</b></div>
-                        <div class="summary-item"><span class="green"><i class="bi bi-check-circle"></i></span><div><strong>Peminjaman Selesai</strong><small>Telah dikembalikan</small></div><b>0</b></div>
-                        <div class="summary-item"><span class="red"><i class="bi bi-exclamation-triangle"></i></span><div><strong>Keterlambatan</strong><small>Peminjaman terlambat</small></div><b class="red-text">0</b></div>
+                        <div class="summary-item"><span class="blue"><i class="bi bi-clipboard-check"></i></span><div><strong>Total Peminjaman</strong><small>Semua waktu</small></div><b>{{ $totalBorrowings }}</b></div>
+                        <div class="summary-item"><span class="light-blue"><i class="bi bi-clock"></i></span><div><strong>Peminjaman Aktif</strong><small>Sedang dipinjam</small></div><b>{{ $activeBorrowings }}</b></div>
+                        <div class="summary-item"><span class="green"><i class="bi bi-check-circle"></i></span><div><strong>Peminjaman Selesai</strong><small>Telah dikembalikan</small></div><b>{{ $completedBorrowings }}</b></div>
+                        <div class="summary-item"><span class="red"><i class="bi bi-exclamation-triangle"></i></span><div><strong>Keterlambatan</strong><small>Peminjaman terlambat</small></div><b class="red-text">{{ $lateBorrowings }}</b></div>
                     </div>
                     <div class="profile-side-card activity-card-user">
-                        <div class="activity-title"><h3>Aktivitas Terakhir</h3><a href="#" id="activity-toggle">Lihat Semua</a></div>
-                        <div class="activity-item"><span class="blue"><i class="bi bi-check2-circle"></i></span><div><strong>Peminjaman baru disetujui</strong><p>Kamera Canon EOS 1300D</p></div><small>20 Mei<br>2024</small></div>
-                        <div class="activity-item"><span class="green"><i class="bi bi-clipboard-check"></i></span><div><strong>Barang dikembalikan</strong><p>Laptop Dell Inspiron 14</p></div><small>18 Mei 2024</small></div>
-                        <div class="activity-item"><span class="orange"><i class="bi bi-three-dots"></i></span><div><strong>Menunggu persetujuan</strong><p>Tripod Kamera</p></div><small>17 Mei<br>2024</small></div>
-                        <div class="activity-item"><span class="light-blue"><i class="bi bi-plus-circle"></i></span><div><strong>Peminjaman baru</strong><p>Proyektor Epson XGA</p></div><small>15 Mei 2024</small></div>
-                        <div class="activity-item activity-more"><span class="blue"><i class="bi bi-check2-circle"></i></span><div><strong>Peminjaman baru disetujui</strong><p>Speaker Portable JBL</p></div><small>12 Mei 2024</small></div>
-                        <div class="activity-item activity-more"><span class="green"><i class="bi bi-clipboard-check"></i></span><div><strong>Barang dikembalikan</strong><p>Mikroskop Olympus CX23</p></div><small>10 Mei 2024</small></div>
-                        <div class="activity-item activity-more"><span class="light-blue"><i class="bi bi-plus-circle"></i></span><div><strong>Peminjaman baru</strong><p>Mouse Logitech M170</p></div><small>8 Mei 2024</small></div>
-                        <div class="activity-item activity-more"><span class="red"><i class="bi bi-exclamation-triangle"></i></span><div><strong>Keterlambatan pengembalian</strong><p>Bola Basket Molten</p></div><small>3 Mei 2024</small></div>
+                        <div class="activity-title"><h3>Aktivitas Terakhir</h3>@if(count($recentActivities) > 4)<a href="#" id="activity-toggle">Lihat Semua</a>@endif</div>
+                        @forelse($recentActivities as $index => $act)
+                            <div class="activity-item {{ $index >= 4 ? 'activity-more' : '' }}">
+                                <span class="{{ $act['badge'] }}"><i class="bi {{ $act['icon'] }}"></i></span>
+                                <div><strong>{{ $act['title'] }}</strong><p>{{ $act['item'] }}</p></div>
+                                <small>{!! $act['date'] !!}</small>
+                            </div>
+                        @empty
+                            <div class="return-empty" style="padding:18px 0;font-size:12px;">Belum ada aktivitas tercatat.</div>
+                        @endforelse
                     </div>
                 </aside>
             </div>
@@ -176,6 +273,13 @@
 
 <div class="profile-toast" id="profile-toast"><i class="bi bi-check-circle-fill"></i> Perubahan profil berhasil disimpan.</div>
 
+<div class="identity-preview-overlay" id="identity-preview-modal" aria-hidden="true">
+    <div class="identity-preview-modal" role="dialog" aria-modal="true" aria-labelledby="identity-preview-title">
+        <button class="identity-preview-close" id="identity-preview-close" type="button" aria-label="Tutup"><i class="bi bi-x-lg"></i></button>
+        <h2 id="identity-preview-title">KTP / Kartu Pelajar</h2>
+        <div class="identity-preview-body" id="identity-preview-body"></div>
+    </div>
+</div>
 @if($showLogout ?? false)
 <div class="user-logout-overlay">
     <div class="user-logout-modal">
@@ -192,6 +296,21 @@
 @endif
 
 <script>
+    const identityLink = document.getElementById('identity-document-link');
+    const identityModal = document.getElementById('identity-preview-modal');
+    const identityBody = document.getElementById('identity-preview-body');
+    function closeIdentityPreview() { identityModal.classList.remove('active'); identityModal.setAttribute('aria-hidden', 'true'); identityBody.innerHTML = ''; }
+    identityLink.addEventListener('click', function (event) {
+        event.preventDefault();
+        const url = this.href;
+        const isPdf = /\\.pdf(?:$|[?#])/i.test(url);
+        identityBody.innerHTML = isPdf ? '<iframe src="' + url + '" title="Dokumen identitas"></iframe>' : '<img src="' + url + '" alt="KTP atau kartu pelajar">';
+        identityModal.classList.add('active');
+        identityModal.setAttribute('aria-hidden', 'false');
+    });
+    document.getElementById('identity-preview-close').addEventListener('click', closeIdentityPreview);
+    identityModal.addEventListener('click', function (event) { if (event.target === identityModal) closeIdentityPreview(); });
+
     const invToggle = document.getElementById('inventaris-toggle');
     const invSub = document.getElementById('inventaris-sub');
     if (localStorage.getItem('invOpen') === '1') {
@@ -227,23 +346,41 @@
         activityToggle.textContent = showAll ? 'Sembunyikan' : 'Lihat Semua';
     });
 
-    document.getElementById('profile-photo-input').addEventListener('change', function () {
+    document.getElementById('profile-photo-input').addEventListener('change', async function () {
         const file = this.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function (event) {
-            const dataUrl = event.target.result;
-            document.getElementById('profile-photo').src = dataUrl;
-            const avatar = document.getElementById('top-avatar');
-            if (avatar) avatar.src = dataUrl;
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+            alert('Foto harus JPG, PNG, atau WEBP dengan ukuran maksimal 2 MB.');
+            this.value = '';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('photo', file);
+        const token = (document.querySelector('input[name="_token"]') || {}).value || '';
+        try {
+            const response = await fetch('{{ url('/profil-user/photo') }}', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(function () { return {}; });
+                throw new Error(error.message || 'Gagal menyimpan foto profil.');
+            }
+            const data = await response.json();
+            document.getElementById('profile-photo').src = data.photo;
+            document.getElementById('top-avatar').src = data.photo;
             const saved = JSON.parse(localStorage.getItem('sipibs_user_profile') || '{}');
-            saved.photo = dataUrl;
+            saved.photo = data.photo;
             localStorage.setItem('sipibs_user_profile', JSON.stringify(saved));
             if (window.applySipibsProfile) window.applySipibsProfile();
-        };
-        reader.readAsDataURL(file);
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            this.value = '';
+        }
     });
-
     function getUserProfileFormData() {
         const saved = JSON.parse(localStorage.getItem('sipibs_user_profile') || '{}');
         return {
@@ -279,13 +416,48 @@
         localStorage.setItem('sipibs_user_profile', JSON.stringify(profile));
         applyUserProfileToPage(profile);
         if (window.applySipibsProfile) window.applySipibsProfile();
+        const token = (document.querySelector('input[name="_token"]') || {}).value || '';
+        fetch('{{ url('/profil-user') }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(profile)
+        }).catch(function () {});
         const toast = document.getElementById('profile-toast');
         toast.classList.add('active');
         setTimeout(() => toast.classList.remove('active'), 2500);
     });
 
-    const savedUserProfile = JSON.parse(localStorage.getItem('sipibs_user_profile') || 'null');
-    if (savedUserProfile) applyUserProfileToPage(savedUserProfile);
+    document.querySelectorAll('.password-toggle').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const input = document.getElementById(button.dataset.passwordTarget);
+            const visible = input.type === 'text';
+            input.type = visible ? 'password' : 'text';
+            button.innerHTML = visible ? '<i class="bi bi-eye"></i>' : '<i class="bi bi-eye-slash"></i>';
+            button.setAttribute('aria-label', visible ? 'Tampilkan password' : 'Sembunyikan password');
+        });
+    });
+    document.getElementById('password-save').addEventListener('click', async function () {
+        const currentPassword = document.getElementById('current-password').value;
+        const newPassword = document.getElementById('new-password').value;
+        const confirmation = document.getElementById('new-password-confirmation').value;
+        if (!currentPassword || !newPassword || !confirmation) return alert('Semua password wajib diisi.');
+        if (newPassword.length < 8) return alert('Password baru minimal 8 karakter.');
+        if (newPassword !== confirmation) return alert('Konfirmasi password baru tidak cocok.');
+        const token = (document.querySelector('input[name="_token"]') || {}).value || '';
+        const response = await fetch('{{ route('profil.user.password') }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token, 'Accept': 'application/json' }, body: JSON.stringify({ current_password: currentPassword, password: newPassword, password_confirmation: confirmation }) });
+        const data = await response.json().catch(function () { return {}; });
+        if (!response.ok) return alert(data.message || 'Password gagal diubah.');
+        document.getElementById('current-password').value = '';
+        document.getElementById('new-password').value = '';
+        document.getElementById('new-password-confirmation').value = '';
+        alert(data.message);
+    });
+    // const savedUserProfile = null;
+    // Data profil selalu menggunakan data database terkini
 
     window.history.scrollRestoration = 'manual';
     window.scrollTo(0, 0);
@@ -294,5 +466,11 @@
 @include('user.partials.profile-sync')
 </body>
 </html>
+
+
+
+
+
+
 
 

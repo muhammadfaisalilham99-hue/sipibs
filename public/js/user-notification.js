@@ -1,11 +1,33 @@
 document.addEventListener('DOMContentLoaded', function () {
     const STORAGE_KEY = 'sipibsUserNotifications';
     const SEED_KEY = 'sipibsUserNotificationsSeeded';
+    const DISMISSED_KEY = 'sipibsDismissedUserNotificationIds';
     const MAX_NOTIFS = 5;
+
+    function loadDismissedIds() {
+        try {
+            const ids = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
+            return Array.isArray(ids) ? ids.map(String) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function dismissNotifications(list) {
+        const dismissed = new Set(loadDismissedIds());
+        list.forEach(function (item) {
+            if (item && item.id) dismissed.add(String(item.id));
+        });
+        localStorage.setItem(DISMISSED_KEY, JSON.stringify(Array.from(dismissed).slice(-100)));
+    }
 
     function loadNotifications() {
         try {
-            return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            const dismissed = new Set(loadDismissedIds());
+            const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            return Array.isArray(list) ? list.filter(function (item) {
+                return !item || !item.id || !dismissed.has(String(item.id));
+            }) : [];
         } catch (e) {
             return [];
         }
@@ -210,8 +232,9 @@ document.addEventListener('DOMContentLoaded', function () {
             clearBtn.addEventListener('click', function (event) {
                 event.preventDefault();
                 event.stopPropagation();
-                const current = loadNotifications().filter(function (n) { return !n.read; });
-                saveNotifications(current);
+                const current = loadNotifications();
+                dismissNotifications(current.filter(function (item) { return item.read; }));
+                saveNotifications(current.filter(function (item) { return !item.read; }));
                 renderNotifications(notif);
             });
         }
@@ -278,3 +301,4 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('[data-user-notification]').forEach(renderNotifications);
     }, 5000);
 });
+

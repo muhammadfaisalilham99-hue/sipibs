@@ -147,6 +147,7 @@
     </style>
 </head>
 <body>
+@include('user.partials.local-storage-cleanup')
 <div class="lightbox-overlay" id="lightbox">
     <span class="lightbox-close">&times;</span>
     <div class="lightbox-container" id="lightbox-container">
@@ -159,24 +160,17 @@
 @php
     $userName = Auth::check() ? Auth::user()->name : 'gashima';
     $userNumber = Auth::check() ? Auth::user()->identity_number : '444444';
-    $tools = [
-        ['name' => 'Mouse HP USB-2', 'cat' => 'Elektronik', 'code' => 'PRJ-001', 'stock' => '5 / 5', 'icon' => 'bi-mouse', 'image' => 'mouse HP.png', 'desc' => 'Mouse optik USB HP berdesain simetris, presisi dan nyaman digunakan untuk kegiatan harian.'],
-        ['name' => 'Keyboard NuPhy Air75', 'cat' => 'Elektronik', 'code' => 'CAM-002', 'stock' => '3 / 3', 'icon' => 'bi-keyboard', 'image' => 'keyboard kantor.png', 'desc' => 'Keyboard mekanik nirkabel 75% profil tipis dengan switch responsif dan koneksi ganda.'],
-        ['name' => 'Laptop Lenovo Ideapad Slim 3', 'cat' => 'Elektronik', 'code' => 'LAP-003', 'stock' => '12 / 12', 'icon' => 'bi-laptop', 'image' => 'Lenovo Ideapad Slim 3.jpg', 'desc' => 'Laptop 14 inci berkinerja tinggi, tipis dan ringan untuk mendukung kegiatan belajar mengajar.'],
-        ['name' => 'Headset Logitech G 432 7.1', 'cat' => 'Audio Visual', 'code' => 'SPK-004', 'stock' => '8 / 8', 'icon' => 'bi-headphones', 'image' => 'HEADSET LOGITECH.png', 'desc' => 'Headset audio 7.1 surround dengan earcup nyaman dan mikrofon penyaring kebisingan.'],
-        ['name' => '4K Webcam 1080P 60fps Mini Video Camera', 'cat' => 'Elektronik', 'code' => 'TRI-005', 'stock' => '15 / 15', 'icon' => 'bi-camera-video', 'image' => 'WEBCAM.jpg', 'desc' => 'Kamera webcam Full HD 1080p 60fps dengan fitur autofokus untuk meeting dan kelas online.'],
-        ['name' => 'Epson EX3240 SVGA 3LCD Projector 3200', 'cat' => 'Praktikum', 'code' => 'MIK-006', 'stock' => '4 / 4', 'icon' => 'bi-easel', 'image' => 'PROYEKTOR EPSON.jpg', 'desc' => 'Projector 3LCD 3200 lumens dengan warna terang tajam untuk presentasi di ruang kelas.'],
-        ['name' => 'Kabel Black High Speed 1.4 Version Gold-Plated HDMI', 'cat' => 'Peralatan Kantor', 'code' => 'GLO-007', 'stock' => '20 / 20', 'icon' => 'bi-usb-plug', 'image' => 'kabel_hdmi.png', 'desc' => 'Kabel HDMI High Speed dengan konektor lapis emas mendukung transmisi sinyal HD stabil.'],
-        ['name' => 'Kabel 0.3m 1.5M 3m VGA To VGA Cable 15 Pin', 'cat' => 'Peralatan Kantor', 'code' => 'BOL-008', 'stock' => '10 / 10', 'icon' => 'bi-plug', 'image' => 'kabel vga.jpg', 'desc' => 'Kabel VGA 15 pin male to male berkulit tebal untuk koneksi monitor dan projector.'],
-        ['name' => 'Kabel LAN CAT6 UTP Cable Networking', 'cat' => 'Peralatan Kantor', 'code' => 'RKT-009', 'stock' => '6 / 6', 'icon' => 'bi-ethernet', 'image' => 'KABEL LAN.jpg', 'desc' => 'Kabel jaringan UTP CAT6 berkecepatan tinggi untuk sambungan internet dan LAN lab.'],
-        ['name' => 'Kabel HDMI to VGA Adapter Gold Plated', 'cat' => 'Peralatan Kantor', 'code' => 'PPT-010', 'stock' => '2 / 2', 'icon' => 'bi-usb-c', 'image' => 'KABEL HDMI TO VGA.jpg', 'desc' => 'Konverter HDMI male ke VGA female untuk menghubungkan laptop modern ke projector.'],
-        ['name' => 'Pen Wireless Remote Controller Laser Pointer', 'cat' => 'Elektronik', 'code' => 'MS-011', 'stock' => '7 / 7', 'icon' => 'bi-mouse', 'image' => 'pointer.jpg', 'desc' => 'Material: ABS + PC Color black Connect mode: 2.4G wireless connection 2.4 GHZ control distance: about 100M.'],
-        ['name' => 'Stop Kontak', 'cat' => 'Elektronik', 'code' => 'PRJ-012', 'stock' => '4 / 4', 'icon' => 'bi-easel', 'image' => 'STOP KONTAK.jpg', 'desc' => 'STOP KONTAK 4 LUBANG 3 METER SAKLAR COLOKAN LISTRIK 4 LUBANG 3 METER Spesifikasi Produk: * Stopkontak : 4 Lubang. * Kabel : 3 Meter..'],
-        ['name' => '2pcs Multifunctional network tester 468 network cable', 'cat' => 'Peralatan Kantor', 'code' => 'HDM-013', 'stock' => '14 / 14', 'icon' => 'bi-usb-plug', 'image' => 'LAN tester.jpg', 'desc' => 'Computer network cable tester RJ45 + R11 tester Product parameters Name: multifunctional tester Function: special equipment Size: 110mm * 105mm Material.'],
-        ['name' => 'Tang Crimping Tool RJ45 RJ11 HT-200R', 'cat' => 'Peralatan Kantor', 'code' => 'LAN-014', 'stock' => '9 / 9', 'icon' => 'bi-ethernet', 'image' => 'Tang crimping.jpg', 'desc' => 'Tang Crimping Tool RJ45 Rj11 Model : HT-200R Tang Crimping yang Kokoh dan Tahan Lama yang dapat digunakan untuk memasang konektor RJ45 pada kabel LAN / Kabel UTP dan Konektor Rj11 pada Kabel Telpon..'],
-        ['name' => 'JBL Boombox 3 Portable Rechargeable Splashproof Bluetooth', 'cat' => 'ELEKTRONIK', 'code' => 'ADP-015', 'stock' => '5 / 5', 'icon' => 'bi-usb-c', 'image' => 'speaker portable.jpg', 'desc' => 'JBL Boombox 3 Speaker Massive sound and deepest bass Enjoy your music with massive JBL Original Pro Sound.'],
-    ];
-    $firstSlideCount = 10;
+    $databaseItems = \App\Models\InventoryItem::orderBy('id')->get();
+    $categoryNames = \Illuminate\Support\Facades\DB::table('item_categories')->pluck('name', 'id');
+    $tools = $databaseItems->map(fn ($item) => [
+        'name' => $item->name,
+        'cat' => $categoryNames[$item->item_category_id] ?? 'Overige',
+        'code' => $item->code,
+        'stock' => $item->available_quantity . ' / ' . $item->total_quantity,
+        'icon' => 'bi-box-seam',
+        'image' => $item->photo,
+        'desc' => $item->description ?: 'Barang inventaris sekolah.',
+    ])->all();    $firstSlideCount = 10;
     $itemsPerSlide = $firstSlideCount;
     $chunks = [array_slice($tools, 0, $firstSlideCount), array_slice($tools, $firstSlideCount)];
 @endphp
@@ -211,7 +205,7 @@
                 @include('user.partials.notification-bell')
 
                 <div class="top-user">
-                    <div><strong id="top-user-name">{{ $userName }}</strong><span>SISWA</span></div>
+                    <div><strong id="top-user-name">{{ $userName }}</strong><span>{{ Auth::check() && Auth::user()->role === 'guru' ? 'GURU' : 'SISWA' }}</span></div>
                     <img class="top-avatar" id="top-avatar" src="{{ asset('images/PROFIL.png') }}" alt="Avatar">
 
                 </div>
@@ -233,7 +227,7 @@
                             <article class="catalog-card" data-item-name="{{ $tool['name'] }}">
                                 <div class="catalog-card-image">
                                     @if(!empty($tool['image']))
-                                        <img src="{{ asset('images/' . $tool['image']) }}" alt="{{ $tool['name'] }}">
+                                        <img src="{{ \Illuminate\Support\Str::startsWith($tool['image'], ['http', 'data:', '/', 'storage/']) ? $tool['image'] : asset('images/' . $tool['image']) }}" alt="{{ $tool['name'] }}">
                                     @else
                                         <i class="bi {{ $tool['icon'] }}"></i>
                                     @endif
@@ -272,6 +266,7 @@
         </section>
     </main>
 </div>
+<script src="{{ asset('js/stock-server-sync.js') }}?v=1"></script>
 <script>
     const invToggle = document.getElementById('inventaris-toggle');
     const invSub = document.getElementById('inventaris-sub');
@@ -296,6 +291,7 @@
 
     function initCatalogStock() {
         const stocks = JSON.parse(localStorage.getItem('sipibsItemStock') || '{}');
+        const totals = JSON.parse(localStorage.getItem('sipibsItemTotal') || '{}');
         document.querySelectorAll('.catalog-card').forEach(card => {
             const name = card.dataset.itemName;
             const stockLabel = card.querySelector('.catalog-stock-label');
@@ -306,6 +302,7 @@
             const parts = initial.split('/').map(s => s.trim());
             let total = parseInt(parts[1]) || 0;
             let available = stocks[name] !== undefined ? stocks[name] : parseInt(parts[0]) || total;
+            if (totals[name] !== undefined) total = parseInt(totals[name]) || total;
 
             stockLabel.textContent = 'Tersedia: ' + available + ' / ' + total;
 
@@ -330,6 +327,9 @@
     }
 
     initCatalogStock();
+
+    window.syncStockFromServer(initCatalogStock);
+    window.addEventListener('storage', initCatalogStock);
 
     const slides = document.querySelectorAll('.catalog-slide');
     const pageBtns = document.querySelectorAll('.pagination-controls .page-btn[data-slide]');
@@ -446,6 +446,11 @@
 @include('user.partials.profile-sync')
 </body>
 </html>
+
+
+
+
+
 
 
 

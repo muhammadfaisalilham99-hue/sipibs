@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-     <link rel="stylesheet" href="{{ asset('css/sipibs-ui.css') }}?v=21">
+     <link rel="stylesheet" href="{{ asset('css/sipibs-ui.css') }}?v=22">
     <style>
         .lightbox-overlay {
             position: fixed;
@@ -147,6 +147,7 @@
     </style>
 </head>
 <body>
+@include('user.partials.local-storage-cleanup')
 <div class="lightbox-overlay" id="lightbox">
     <span class="lightbox-close">&times;</span>
     <div class="lightbox-container" id="lightbox-container">
@@ -226,7 +227,7 @@
             <div class="top-actions">
                 @include('user.partials.notification-bell')
                 <div class="top-user">
-                    <div><strong id="top-user-name">{{ $userName }}</strong><span>SISWA</span></div>
+                    <div><strong id="top-user-name">{{ $userName }}</strong><span>{{ Auth::check() && Auth::user()->role === 'guru' ? 'GURU' : 'SISWA' }}</span></div>
                     <img class="top-avatar" id="top-avatar" src="{{ asset('images/PROFIL.png') }}" alt="Avatar">
 
                 </div>
@@ -261,7 +262,7 @@
                         <div id="dashboard-active-loans"></div>
                         <a class="forgot-link" style="display:block;text-align:center;margin-top:12px;" href="{{ url('/riwayat-pinjam') }}">Lihat Riwayat Lengkap</a>
                     </div>
-                    <div class="return-info"><strong><i class="bi bi-info-circle"></i> Informasi Pengembalian</strong><br>Harap kembalikan alat sebelum pukul 15.00 WIB pada tanggal batas pengembalian untuk menghindari denda poin sanksi.</div>
+                    <div class="return-info"><strong><i class="bi bi-info-circle"></i> Informasi Pengembalian</strong><br>Harap kembalikan alat sebelum pukul 15.00 WIB pada tanggal batas pengembalian untuk menghindari denda keterlambatan waktu.</div>
                 </aside>
             </div>
         </section>
@@ -358,10 +359,30 @@
         const request = parseDashboardJson('sipibsLoanRequest', null);
         const fallback = decision && decision.request ? decision.request : request;
         const list = Array.isArray(history) ? history.slice() : [];
-        if (fallback && fallback.id && !list.some(loan => loan.id === fallback.id)) list.unshift(fallback);
-        return list;
-    }
+        if (fallback) list.unshift(fallback);
 
+        const normalizeDate = value => {
+            const date = String(value || '').trim();
+            const match = date.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+            return match ? match[3] + match[2].padStart(2, '0') + match[1].padStart(2, '0') : date.replace(/[^0-9]/g, '');
+        };
+        const loanKey = loan => [
+            String(loan.barang || loan.item || '').trim().toLowerCase(),
+            normalizeDate(loan.tanggalPinjam || loan.borrow_date),
+            normalizeDate(loan.tanggalKembali || loan.due_date)
+        ].join('|');
+        const strength = loan => (loan.borrowingId != null ? 2 : 0) + (loan.id ? 1 : 0);
+        const unique = new Map();
+
+        list.forEach(loan => {
+            if (!loan) return;
+            const key = loanKey(loan);
+            const existing = unique.get(key);
+            if (!existing || strength(loan) > strength(existing)) unique.set(key, loan);
+        });
+
+        return Array.from(unique.values());
+    }
     function formatDashboardDate(value) {
         if (!value) return '-';
         if (String(value).includes('/')) return value;
@@ -430,8 +451,10 @@
 </script>
 <script src="{{ asset('js/user-notification.js') }}?v=5"></script>
 @include('user.partials.profile-sync')
+@include('user.partials.loan-server-sync')
 </body>
 </html>
+
 
 
 

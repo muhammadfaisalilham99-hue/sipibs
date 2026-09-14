@@ -9,6 +9,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title }}</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -30,7 +31,8 @@
             <a class="nav-item {{ $active === 'dashboard' ? 'active' : '' }}" href="{{ url('/dashboard-admin') }}"><i class="bi bi-house-fill"></i> Dashboard</a>
             <div class="menu-caption nav-caption">MASTER DATA</div>
             <a class="nav-item {{ $active === 'master' ? 'active' : '' }}" href="{{ url('/admin/data-master') }}"><i class="bi bi-box-seam-fill"></i> Data Master <span style="margin-left:auto;">›</span></a>
-<a class="nav-item {{ $active === 'user' ? 'active' : '' }}" href="{{ url('/admin/data-user') }}"><i class="bi bi-people-fill"></i> Data User <span style="margin-left:auto;">›</span></a>
+<a class="nav-item {{ $active === 'condition' ? 'active' : '' }}" href="{{ url('/admin/kondisi-barang') }}"><i class="bi bi-clipboard2-pulse-fill"></i> Kondisi Barang <span style="margin-left:auto;">›</span></a>
+            <a class="nav-item {{ $active === 'user' ? 'active' : '' }}" href="{{ url('/admin/data-user') }}"><i class="bi bi-people-fill"></i> Data User <span style="margin-left:auto;">›</span></a>
             <div class="menu-caption nav-caption">TRANSAKSI</div>
             <a class="nav-item {{ $active === 'peminjaman' ? 'active' : '' }}" href="{{ url('/admin/peminjaman') }}"><i class="bi bi-journal-check"></i> Peminjaman <span style="margin-left:auto;">›</span></a>
             <a class="nav-item {{ $active === 'pengembalian' ? 'active' : '' }}" href="{{ url('/admin/pengembalian') }}"><i class="bi bi-card-checklist"></i> Pengembalian <span style="margin-left:auto;">›</span></a>
@@ -49,7 +51,7 @@
             <div class="page-label">Data Master</div>
             <div class="top-actions">
                 @include('admin.partials.notification-bell')
-                <i class="bi bi-question-circle"></i>
+                
                 <div class="top-user">
                     <div><strong id="top-user-name">Admin</strong><span>Administrator</span></div>
                     <img class="top-avatar avatar-target" src="{{ asset('images/PROFIL.png') }}" alt="Admin">
@@ -140,9 +142,7 @@
                                 <th style="width: 210px;">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody id="masterTableBody">
-                            <!-- Dynamic Table Rows -->
-                        </tbody>
+                                            <tbody id="masterTableBody"></tbody>
                     </table>
                 </div>
 
@@ -197,8 +197,9 @@
                                 <input type="number" id="addItemStock" min="0" placeholder="Masukkan stok awal" required>
                             </div>
                             <div class="add-item-form-group">
-                                <label>Nama File Foto (opsional)</label>
-                                <input type="text" id="addItemImage" placeholder="Contoh: kamera.jpg">
+                                <label>Foto Barang (opsional)</label>
+                                <input type="file" id="addItemImage" class="add-item-file-input" accept="image/jpeg,image/png,image/webp">
+                                <small id="addItemImageName" style="color:#64748b;">Pilih foto barang dari komputer</small>
                             </div>
                         </div>
 
@@ -231,6 +232,8 @@
                         </div>
                     </div>
                     <div class="detail-item-modal-actions">
+                        <input type="file" id="detailItemPhotoInput" accept="image/jpeg,image/png,image/webp" hidden>
+                        <button type="button" class="btn-add-save" id="btnChangeDetailPhoto"><i class="bi bi-image"></i> Ganti Foto</button>
                         <button type="button" class="btn-add-cancel" id="closeDetailItemModal2">Tutup</button>
                     </div>
                 </div>
@@ -362,11 +365,19 @@
 
 <script>
     window.SIPIBS_IMAGE_BASE = '{{ asset("images") }}/';
+    window.__apiBase = @json(rtrim(url('/api'), '/'));
 </script>
-<script src="{{ asset('js/admin-datamaster.js') }}?v=8"></script>
-<script src="{{ asset('js/admin-stock-modal.js') }}?v=2"></script>
+<script src="{{ asset('js/stock-server-sync.js') }}?v=1"></script>
+<script src="{{ asset('js/admin-datamaster.js') }}?v=13"></script>
+<script src="{{ asset('js/admin-stock-modal.js') }}?v=4"></script>
 @include('admin.partials.sidebar-scroll')
 @include('admin.partials.profile-sync')
 <script src="{{ asset('js/admin-notification.js') }}?v=2"></script>
 </body>
 </html>
+
+
+
+
+
+

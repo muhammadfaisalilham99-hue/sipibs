@@ -21,9 +21,13 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'identity_number',
+        'identity_document',
         'email',
         'password',
         'role',
+        'class_name',
+        'birth_date',
+        'gender',
     ];
 
     /**
@@ -49,3 +53,5 @@ class User extends Authenticatable
         ];
     }
 }
+
+

@@ -1085,6 +1085,9 @@
 .add-item-form-group label { color:#172554; font-size:13px; font-weight:800; }
 .add-item-form-group input, .add-item-form-group select { height:46px; border:1px solid #cbd5e1; border-radius:10px; padding:0 14px; font:inherit; color:#0f172a; outline:none; }
 .add-item-form-group input:focus, .add-item-form-group select:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+.add-item-file-input { height:46px !important; padding:5px 8px !important; display:flex; align-items:center; text-align:center; cursor:pointer; color:#64748b !important; }
+.add-item-file-input::file-selector-button { height:34px; margin-right:10px; padding:0 14px; border:1px solid #2563eb; border-radius:7px; background:#eff6ff; color:#1d4ed8; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.add-item-file-input::file-selector-button:hover { background:#dbeafe; }
 .add-item-actions { display:flex; justify-content:flex-end; gap:12px; margin-top:24px; }
 .btn-add-cancel, .btn-add-save { height:44px; border-radius:10px; padding:0 18px; font-weight:800; cursor:pointer; }
 .btn-add-cancel { background:#fff; color:#0f172a; border:1px solid #cbd5e1; }
@@ -1108,3 +1111,4 @@
 .detail-item-row strong { color:#0f172a; font-weight:800; text-align:right; }
 .detail-item-modal-actions { display:flex; justify-content:flex-end; margin-top:24px; }
 @media (max-width:520px) { .detail-item-modal-body { flex-direction:column; align-items:center; } .detail-item-preview { width:120px; height:120px; } }
+

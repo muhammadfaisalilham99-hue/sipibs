@@ -203,7 +203,7 @@
                         <i class="ph-duotone ph-cube text-2xl"></i>
                     </div>
                     <div>
-                        <h4 class="text-2xl font-black text-slate-900">100+</h4>
+                        <h4 class="text-2xl font-black text-slate-900">15</h4>
                         <p class="text-slate-500 font-medium text-xs">Barang Tersedia</p>
                     </div>
                 </div>
@@ -214,7 +214,7 @@
                         <i class="ph-duotone ph-arrows-clockwise text-2xl"></i>
                     </div>
                     <div>
-                        <h4 class="text-2xl font-black text-slate-900">200+</h4>
+                        <h4 class="text-2xl font-black text-slate-900">26</h4>
                         <p class="text-slate-500 font-medium text-xs">Transaksi</p>
                     </div>
                 </div>

@@ -19,8 +19,10 @@
     </style>
 </head>
 <body>
+@include('user.partials.local-storage-cleanup')
 @php
     $userName = Auth::check() ? Auth::user()->name : 'Siswa';
+    $itemPhotos = \App\Models\InventoryItem::pluck('photo', 'name')->toArray();
 @endphp
 <div class="app-shell">
     <aside class="sidebar user-sidebar">
@@ -52,7 +54,7 @@
             <div class="top-actions">
                 @include('user.partials.notification-bell')
 
-                <div class="top-user"><div><strong id="top-user-name">{{ $userName }}</strong><span>SISWA</span></div><img class="top-avatar" id="top-avatar" src="{{ asset('images/PROFIL.png') }}" alt="Avatar"></div>
+                <div class="top-user"><div><strong id="top-user-name">{{ $userName }}</strong><span>{{ Auth::check() && Auth::user()->role === 'guru' ? 'GURU' : 'SISWA' }}</span></div><img class="top-avatar" id="top-avatar" src="{{ asset('images/PROFIL.png') }}" alt="Avatar"></div>
             </div>
         </header>
 
@@ -79,6 +81,7 @@
                                 <option value="Dipinjam">Dipinjam</option>
                                 <option value="Dikembalikan">Dikembalikan</option>
                                 <option value="Menunggu">Menunggu</option>
+                                <option value="Menunggu Persetujuan">Menunggu Persetujuan</option>
                                 <option value="Ditolak">Ditolak</option>
                                 <option value="Terlambat">Terlambat</option>
                             </select>
@@ -168,60 +171,79 @@
     function getRawLoanHistory() {
         let history = [];
         try { history = JSON.parse(localStorage.getItem('sipibsLoanHistory') || '[]'); } catch (e) {}
-        if (!Array.isArray(history) || history.length === 0) {
-            history = [
-                {
-                    id: 'B802931-B',
-                    nama: 'Ahmad Fauzi',
-                    nis: '220401001',
-                    barang: 'Kamera DSLR Canon EOS 80D',
-                    serial: 'B802931-B',
-                    kategori: 'Multimedia',
-                    jumlah: 1,
-                    tanggalPinjam: '24/10/2023',
-                    tanggalKembali: '26/10/2023',
-                    status: 'Dipinjam'
-                },
-                {
-                    id: 'OLY-X300',
-                    nama: 'Siti Rahma',
-                    nis: '220401002',
-                    barang: 'Mikroskop Binokuler Olympus',
-                    serial: 'OLY-X300',
-                    kategori: 'Laboratorium',
-                    jumlah: 1,
-                    tanggalPinjam: '25/10/2023',
-                    tanggalKembali: '28/10/2023',
-                    status: 'Dipinjam'
-                },
-                {
-                    id: 'LP-001-2023',
-                    nama: 'Budi Santoso',
-                    nis: '220401003',
-                    barang: 'Laptop Dell Precision 3561',
-                    serial: 'LP-001-2023',
-                    kategori: 'Komputer',
-                    jumlah: 1,
-                    tanggalPinjam: '15/10/2023',
-                    tanggalKembali: '22/10/2023',
-                    status: 'Dikembalikan'
-                },
-                {
-                    id: 'TR-005-2023',
-                    nama: 'Citra Dewi',
-                    nis: '220401004',
-                    barang: 'Tripod Excell Promon 500',
-                    serial: 'TR-005-2023',
-                    kategori: 'Multimedia',
-                    jumlah: 1,
-                    tanggalPinjam: '14/10/2023',
-                    tanggalKembali: '20/10/2023',
-                    status: 'Dikembalikan'
-                }
-            ];
-            try { localStorage.setItem('sipibsLoanHistory', JSON.stringify(history)); } catch (e) {}
-        }
+        if (!Array.isArray(history)) history = [];
         return history;
+    }
+
+function getLoanSignature(loan) {
+        function normDate(v) {
+            const s = String(v || '').trim();
+            if (!s) return '';
+            const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if (m) return m[3] + m[2] + m[1];
+            return s.replace(/[^0-9]/g, '');
+        }
+        return [String(loan.nis || loan.identity_number || '').replace(/\D/g, ''), String(loan.barang || loan.item || '').toLowerCase(), normDate(loan.tanggalPinjam), normDate(loan.tanggalKembali)].join('|');
+    }
+
+    function isSameLoan(a, b) {
+        if (!a || !b) return false;
+        if (a.borrowingId != null && b.borrowingId != null && Number(a.borrowingId) === Number(b.borrowingId)) return true;
+        if (a.id && b.id && String(a.id) === String(b.id)) return true;
+        const ended = (x) => ['returned', 'dikembalikan', 'diterima', 'selesai', 'bermasalah', 'complete', 'completed'].includes(String(x.status || '').toLowerCase());
+        if (!ended(a) && !ended(b)) return getLoanSignature(a) === getLoanSignature(b);
+        return false;
+    }
+
+    function dedupeLoanRows(list) {
+        const meaningful = (x) => /^(dipinjam|approved|dikembalikan|returned|ditolak|rejected)$/.test(String(x.status || '').toLowerCase());
+        const out = [];
+        (Array.isArray(list) ? list : []).forEach(function (loan) {
+            if (!loan) return;
+            const idx = out.findIndex(function (x) { return isSameLoan(x, loan); });
+            if (idx === -1) { out.push(loan); return; }
+            const existing = out[idx];
+            const es = (existing.borrowingId != null ? 2 : 0) + (meaningful(existing) ? 1 : 0);
+            const ns = (loan.borrowingId != null ? 2 : 0) + (meaningful(loan) ? 1 : 0);
+            if (ns > es) out[idx] = loan;
+        });
+        return out;
+    }
+
+        const ITEM_PHOTOS = @json($itemPhotos);
+    function renderItemMedia(name, icon) {
+        const normalizedName = String(name || '').trim().toLowerCase();
+        const matchedItem = Object.entries(ITEM_PHOTOS || {}).find(([itemName]) =>
+            itemName.trim().toLowerCase() === normalizedName
+        );
+        const photo = matchedItem ? matchedItem[1] : (normalizedName === '4k webcam 1080p 60fps mini video camera' ? 'WEBCAM.jpg' : '');
+        if (photo) {
+            const src = (photo.startsWith('http') || photo.startsWith('/') || photo.startsWith('storage/'))
+                ? photo
+                : '{{ asset("images") }}/' + photo;
+            return '<img src="' + src + '" alt="' + (name || 'Barang') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'<i class=&quot;bi ' + icon + '&quot;></i>\';">';
+        }
+        return '<i class="bi ' + icon + '"></i>';
+    }
+        const returnStatusByLoan = {};
+
+    function syncReturnStatuses() {
+        fetch((window.__apiBase || '/api') + '/pengembalian/history', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function (res) {
+            if (!res.ok) throw new Error('fail');
+            return res.json();
+        })
+        .then(function (data) {
+            Object.keys(returnStatusByLoan).forEach(function (k) { delete returnStatusByLoan[k]; });
+            (data && Array.isArray(data.history) ? data.history : []).forEach(function (rec) {
+                if (rec.loanId != null) returnStatusByLoan[String(rec.loanId)] = rec.status;
+            });
+            renderLatestLoanHistory();
+        })
+        .catch(function () {});
     }
 
     function getLoanHistoryRows() {
@@ -231,8 +253,8 @@
         let request = null;
         try { request = JSON.parse(localStorage.getItem('sipibsLoanRequest') || 'null'); } catch (e) {}
         const fallback = decision && decision.request ? decision.request : request;
-        let list = history.slice();
-        if (fallback && fallback.id && !list.some(loan => loan.id === fallback.id)) list.unshift(fallback);
+        let list = dedupeLoanRows(history.slice());
+        if (fallback && fallback.id && !list.some(loan => isSameLoan(loan, fallback))) list.unshift(fallback);
         try {
             const activeReturns = list.filter(loan => {
                 const status = String(loan.status || 'Dipinjam').toLowerCase().trim();
@@ -241,23 +263,47 @@
             localStorage.setItem('sipibsReturnLoanItems', JSON.stringify(activeReturns));
         } catch (e) {}
         
+        list.sort(function (a, b) {
+            const aDate = String(a.tanggalPinjam || a.pinjam || a.borrowDate || '').split('/').reverse().join('-');
+            const bDate = String(b.tanggalPinjam || b.pinjam || b.borrowDate || '').split('/').reverse().join('-');
+            const dateOrder = bDate.localeCompare(aDate);
+            if (dateOrder !== 0) return dateOrder;
+            return Number(b.borrowingId || b.id || 0) - Number(a.borrowingId || a.id || 0);
+        });
+
         return list.map((loan, index) => {
             const rawStatus = String(loan.status || 'pending').toLowerCase();
             let label = 'Menunggu';
             let color = 'yellow';
 
-            if (rawStatus === 'dipinjam' || rawStatus === 'approved') {
+                        const borrowingId = String(loan.borrowingId || loan.id || '');
+            const returnStatus = returnStatusByLoan[borrowingId] || '';
+
+            if (returnStatus === 'Menunggu Persetujuan' || returnStatus === 'Menunggu Verifikasi') {
+                label = 'Menunggu Persetujuan';
+                color = 'yellow';
+            } else if (returnStatus === 'Dikembalikan') {
+                label = 'Dikembalikan';
+                color = 'green';
+                        } else if (returnStatus === 'Terdapat Masalah') {
+                label = 'Terdapat Masalah';
+                color = 'red';
+            } else if (returnStatus === 'Denda') {
+                label = 'Terkena Denda';
+                color = 'orange';
+            } else if (rawStatus === 'dipinjam' || rawStatus === 'approved') {
                 label = 'Dipinjam';
                 color = 'blue';
+            } else if ((rawStatus === 'dikembalikan' || rawStatus === 'returned') && returnStatus) {
+                label = returnStatus === 'Menunggu Verifikasi' ? 'Menunggu Persetujuan' : returnStatus;
+                color = label === 'Menunggu Persetujuan' ? 'yellow' : (label === 'Dikembalikan' ? 'green' : 'red');
             } else if (rawStatus === 'dikembalikan' || rawStatus === 'returned') {
                 label = 'Dikembalikan';
                 color = 'green';
             } else if (rawStatus === 'ditolak' || rawStatus === 'rejected') {
                 label = 'Ditolak';
                 color = 'red';
-            }
-
-            return {
+            }return {
                 no: index + 1,
                 id: loan.id || '',
                 statusKey: rawStatus,
@@ -325,7 +371,7 @@
             tr.innerHTML = `
                 <td>${row.no}</td>
                 <td><strong>${row.borrower}</strong><small>NIM. ${row.nim}</small></td>
-                <td><div class="history-item-cell"><span><i class="bi ${row.icon}"></i></span><div><strong>${row.item}</strong><small>${row.desc}</small></div></div></td>
+                <td><div class="history-item-cell"><span>${renderItemMedia(row.item, row.icon)}</span><div><strong>${row.item}</strong><small>${row.desc}</small></div></div></td>
                 <td>${row.pinjam}<small>${row.pinjam_time}</small></td>
                 <td>${row.kembali}<small>${row.kembali_time}</small></td>
                 <td><span class="history-status ${row.type}"><i class="bi bi-circle-fill"></i> ${row.status}</span></td>
@@ -352,11 +398,13 @@
 
     document.getElementById('btn-filter-apply').addEventListener('click', renderLatestLoanHistory);
     document.getElementById('filter-search').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') { e.preventDefault(); renderLatestLoanHistory(); }
+        if (e.key === 'Enter') { e.preventDefault(); renderLatestLoanHistory();
+    syncReturnStatuses(); }
     });
     document.getElementById('filter-status').addEventListener('change', renderLatestLoanHistory);
 
     renderLatestLoanHistory();
+    syncReturnStatuses();
     window.history.scrollRestoration = 'manual';
     window.scrollTo(0, 0);
 
@@ -388,8 +436,21 @@
 </script>
 <script src="{{ asset('js/user-notification.js') }}?v=5"></script>
 @include('user.partials.profile-sync')
+@include('user.partials.loan-server-sync')
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

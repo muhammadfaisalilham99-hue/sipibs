@@ -9,7 +9,21 @@ const STORAGE_KEY = 'sipibsReturnSubmissions';
 
     const defaultPhoto = window.PENGEMBALIAN_DEFAULT_PHOTO || '/sipibs/public/images/PROYEKTOR EPSON.jpg';
 
+    function apiUrl(path) {
+        const base = window.SIPIBS_API_BASE || '';
+        return base + path;
+    }
+
 const sampleItems = [];
+    const dbReturnPhotos = new Map();
+
+    function cacheDbPhotos(items) {
+        (items || []).forEach(function (item) {
+            if (item && item.source === 'db' && item.dbReturnId && Array.isArray(item.photos)) {
+                dbReturnPhotos.set(String(item.dbReturnId), item.photos);
+            }
+        });
+    }
 
     function getStoredData() {
         try {
@@ -17,7 +31,17 @@ const sampleItems = [];
             let parsed = JSON.parse(raw || '[]');
             if (!Array.isArray(parsed)) parsed = [];
             parsed = parsed.filter(item => item && item.id !== 'RET-SAMPLE-1');
+            const seen = new Set();
+            parsed = parsed.filter(function (item) {
+                const key = item.dbReturnId ? ('DBRET-' + item.dbReturnId) : (item.id ? String(item.id) : '');
+                if (!key || seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
             parsed.forEach(item => {
+                if (item.source === 'db' && item.dbReturnId && dbReturnPhotos.has(String(item.dbReturnId))) {
+                    item.photos = dbReturnPhotos.get(String(item.dbReturnId));
+                }
                 if (!Array.isArray(item.photos)) item.photos = [];
                 if (!item.fineAmount) item.fineAmount = '30.000';
                 if (!item.borrower || String(item.borrower).trim() === 'Admin SIPIBS') {
@@ -30,7 +54,7 @@ const sampleItems = [];
                     } catch (err) {}
                 }
             });
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+            saveData(parsed);
             return parsed;
         } catch (e) {
             return [];
@@ -38,7 +62,12 @@ const sampleItems = [];
     }
 
     function saveData(data) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        cacheDbPhotos(data);
+        const storable = (data || []).map(function (item) {
+            if (!item || item.source !== 'db' || !item.dbReturnId) return item;
+            return Object.assign({}, item, { photos: [] });
+        });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(storable));
     }
 
 function showToast(text) {
@@ -104,6 +133,67 @@ function escapeHtml(str) {
         if (!img) return fallbackSrc;
         if (String(img).indexOf('http') === 0) return img;
         return getImageBase() + '/' + String(img).split('/').map(encodeURIComponent).join('/') + '?v=3';
+    }
+
+    function getReturnDrafts() {
+        const drafts = {};
+        if (!body) return drafts;
+
+        body.querySelectorAll('tr[data-id]').forEach(function (row) {
+            const id = row.dataset.id;
+            if (!id) return;
+            const decision = row.querySelector('.decision-wrap');
+            drafts[id] = {
+                condition: row.querySelector('.item-condition')?.value || '',
+                adminNote: row.querySelector('.item-note')?.value || '',
+                fineType: row.querySelector('.item-fine')?.value || '',
+                fineAmount: row.querySelector('.item-fine-amount')?.value || '',
+                decision: decision ? (decision.dataset.value || '') : ''
+            };
+        });
+
+        return drafts;
+    }
+
+    function loadDbPendingReturns() {
+        fetch(apiUrl('/pengembalian/admin/pending'), {
+            method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Cache-Control': 'no-cache' }
+        })
+        .then(function (res) {
+            if (!res.ok) throw new Error('fail');
+            return res.json();
+        })
+        .then(function (data) {
+            const list = data && Array.isArray(data.returns) ? data.returns : [];
+            const drafts = getReturnDrafts();
+            const localOnly = getStoredData().filter(function (item) { return item.source !== 'db' || item.processed === true; });
+            const serverItems = list.map(function (r) {
+                return {
+                    id: 'DBRET-' + String(r.id),
+                    dbReturnId: String(r.id),
+                    loanId: r.borrowing_id,
+                    borrower: r.borrower || '-',
+                    serial: r.serial || '-',
+                    itemName: r.itemName || '-',
+                    quantity: r.quantity || 1,
+                    condition: r.condition || 'Baik (Fungsional & Bersih)',
+                    adminNote: r.notes && r.notes !== '-' ? r.notes : '',
+                    photos: Array.isArray(r.photos) ? r.photos : [],
+                    submittedAt: r.returnedAt,
+                    status: 'menunggu',
+                    source: 'db'
+                };
+            });
+            serverItems.forEach(function (item) { Object.assign(item, drafts[item.id] || {}); });
+            saveData(localOnly.concat(serverItems));
+            const searchInput = document.getElementById('returnSearchInput');
+            renderTable(searchInput ? searchInput.value : '');
+            renderArchive();
+        })
+        .catch(function () {});
     }
 
 function renderTable(filter = '') {
@@ -379,6 +469,27 @@ item.status = item.decision;
                 item.verifiedAt = new Date().toISOString();
                 item.processed = true;
                 item.processedAt = new Date().toISOString();
+                if (item.source === 'db' && item.dbReturnId && !item.verified) {
+                    const verifyAction = (item.decision === 'Ditolak') ? 'problem' : 'accepted';
+                    item.verified = true;
+                    fetch(apiUrl('/pengembalian/' + encodeURIComponent(item.dbReturnId) + '/verify'), {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': window.SIPIBS_CSRF || ''
+                        },
+                        body: JSON.stringify({ action: verifyAction })
+                    })
+                    .then(function (res) {
+                        if (!res.ok) throw new Error('fail');
+                    })
+                    .catch(function () {
+                        item.verified = false;
+                        saveData(getStoredData());
+                    });
+                }
                 if (item.decision === 'Diterima') {
                     pushUserNotification({
                         title: 'Pengembalian Diterima',
@@ -423,6 +534,29 @@ item.status = item.decision;
                     }
                 }
                 if (item.decision === 'Denda') {
+                    if (item.source === 'db' && item.dbReturnId) {
+                        const fineAmountNum = parseInt(String(item.fineAmount || '0').replace(/\D/g, '') || '0');
+                        fetch(apiUrl('/denda/create-from-return'), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': window.SIPIBS_CSRF || ''
+                            },
+                            body: JSON.stringify({
+                                return_id: item.dbReturnId,
+                                fine_type: item.fineType || 'Keterlambatan Pengembalian',
+                                fine_amount: fineAmountNum || 1000,
+                                notes: item.adminNote || null
+                            })
+                        })
+                        .then(function (res) {
+                            if (!res.ok) throw new Error('fail');
+                            return res.json();
+                        })
+                        .catch(function () {});
+                    }
                     const activeFine = {
                         id: item.id,
                         loanId: item.loanId || item.id,
@@ -475,10 +609,12 @@ saveData(currentData);
         renderTable(document.getElementById('returnSearchInput').value);
         showToast('Perubahan dibatalkan.');
     });
-
-    document.getElementById('helpTopBtn').addEventListener('click', function () {
-        showToast('Panduan Pengembalian: Periksa kondisi barang, beri catatan, pilih keputusan lalu tekan Simpan.');
-    });
+    const helpTopBtn = document.getElementById('helpTopBtn');
+    if (helpTopBtn) {
+        helpTopBtn.addEventListener('click', function () {
+            showToast('Panduan Pengembalian: Periksa kondisi barang, beri catatan, pilih keputusan lalu tekan Simpan.');
+        });
+    }
 
     document.getElementById('returnSearchInput').addEventListener('input', function () {
         renderTable(this.value);
@@ -493,8 +629,34 @@ if (archiveCollapseBtn && archiveBodyWrap) {
         });
     }
 
+    function seedPendingReturnsFromServer() {
+        const pending = Array.isArray(window.SIPIBS_PENDING_RETURNS) ? window.SIPIBS_PENDING_RETURNS : [];
+        if (!pending.length) return;
+        const localOnly = getStoredData().filter(function (item) { return item.source !== 'db' || item.processed === true; });
+        saveData(localOnly.concat(pending));
+    }
+
+    seedPendingReturnsFromServer();
     renderTable();
     renderArchive();
+    loadDbPendingReturns();
+
+    window.addEventListener('storage', function (e) {
+        if (e.key === STORAGE_KEY || e.key === 'sipibsAdminNotifications') {
+            const searchInput = document.getElementById('returnSearchInput');
+            renderTable(searchInput ? searchInput.value : '');
+            renderArchive();
+            loadDbPendingReturns();
+        }
+    });
+
+    setInterval(loadDbPendingReturns, 8000);
 });
+
+
+
+
+
+
 
 

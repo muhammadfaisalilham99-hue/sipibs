@@ -29,7 +29,8 @@
             <a class="nav-item {{ $active === 'dashboard' ? 'active' : '' }}" href="{{ url('/dashboard-admin') }}"><i class="bi bi-house-fill"></i> Dashboard</a>
             <div class="menu-caption nav-caption">MASTER DATA</div>
             <a class="nav-item {{ $active === 'master' ? 'active' : '' }}" href="{{ url('/admin/data-master') }}"><i class="bi bi-box-seam-fill"></i> Data Master <span style="margin-left:auto;">›</span></a>
-<a class="nav-item {{ $active === 'user' ? 'active' : '' }}" href="{{ url('/admin/data-user') }}"><i class="bi bi-people-fill"></i> Data User <span style="margin-left:auto;">›</span></a>
+<a class="nav-item {{ $active === 'condition' ? 'active' : '' }}" href="{{ url('/admin/kondisi-barang') }}"><i class="bi bi-clipboard2-pulse-fill"></i> Kondisi Barang <span style="margin-left:auto;">›</span></a>
+            <a class="nav-item {{ $active === 'user' ? 'active' : '' }}" href="{{ url('/admin/data-user') }}"><i class="bi bi-people-fill"></i> Data User <span style="margin-left:auto;">›</span></a>
             <div class="menu-caption nav-caption">TRANSAKSI</div>
             <a class="nav-item {{ $active === 'peminjaman' ? 'active' : '' }}" href="{{ url('/admin/peminjaman') }}"><i class="bi bi-journal-check"></i> Peminjaman <span style="margin-left:auto;">›</span></a>
             <a class="nav-item {{ $active === 'pengembalian' ? 'active' : '' }}" href="{{ url('/admin/pengembalian') }}"><i class="bi bi-card-checklist"></i> Pengembalian <span style="margin-left:auto;">›</span></a>
@@ -54,7 +55,7 @@
             </div>
             <div class="top-actions">
                 @include('admin.partials.notification-bell')
-                <i class="bi bi-question-circle"></i>
+                
                 <div class="top-user">
                     <div>
                         <strong id="topAdminName">Admin SIPIBS</strong>
@@ -215,15 +216,15 @@
                             <i class="bi bi-people"></i>
                         </div>
                         <div class="user-summary-grid">
-                            <!-- Card 1: Total Pengguna -->
+<!-- Card 1: Total Pengguna -->
                             <div class="user-summary-card total-card">
                                 <span class="card-label">Total Pengguna</span>
                                 <div class="card-val-row">
-                                    <h3 class="card-big-num">1,248</h3>
-                                    <span class="pill-badge-blue">+12 bln ini</span>
+                                    <h3 class="card-big-num">{{ number_format($totalUsers ?? 0) }}</h3>
+                                    <span class="pill-badge-blue">di database</span>
                                 </div>
                                 <div class="bar-track">
-                                    <div class="bar-progress" style="width: 78%;"></div>
+                                    <div class="bar-progress" style="width: 100%;"></div>
                                 </div>
                             </div>
 
@@ -234,7 +235,7 @@
                                 </div>
                                 <div>
                                     <span class="card-label">Pengguna Aktif</span>
-                                    <h3 class="card-med-num blue-num">1,150</h3>
+                                    <h3 class="card-med-num blue-num">{{ number_format($activeUsers ?? 0) }}</h3>
                                 </div>
                             </div>
 
@@ -245,7 +246,7 @@
                                 </div>
                                 <div>
                                     <span class="card-label">Menunggu Verifikasi</span>
-                                    <h3 class="card-med-num red-num">98</h3>
+                                    <h3 class="card-med-num red-num">{{ number_format($pendingVerifications ?? 0) }}</h3>
                                 </div>
                             </div>
                         </div>
@@ -431,3 +432,4 @@
 <script src="{{ asset('js/admin-notification.js') }}?v=2"></script>
 </body>
 </html>
+

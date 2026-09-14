@@ -23,9 +23,13 @@ class InventoryItem extends Model
         'damaged_quantity',
         'condition',
         'status',
-        'location',
         'photo',
     ];
+
+    public function conditionHistories(): HasMany
+    {
+        return $this->hasMany(ItemConditionHistory::class)->latest('checked_at');
+    }
 
     public function borrowings(): HasMany
     {

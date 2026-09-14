@@ -1,21 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const userCatalogItems = [
-        { name: 'Laptop Lenovo Ideapad Slim 3', cat: 'Elektronik', code: 'LAP-003', stockTotal: 12, icon: 'bi-laptop', image: 'Lenovo Ideapad Slim 3.jpg', merk: 'Lenovo' },
-        { name: 'Mouse HP USB-2', cat: 'Elektronik', code: 'PRJ-001', stockTotal: 5, icon: 'bi-mouse', image: 'mouse HP.png', merk: 'HP' },
-        { name: 'Keyboard NuPhy Air75', cat: 'Elektronik', code: 'CAM-002', stockTotal: 3, icon: 'bi-keyboard', image: 'keyboard kantor.png', merk: 'NuPhy' },
-        { name: 'Headset Logitech G 432 7.1', cat: 'Audio Visual', code: 'SPK-004', stockTotal: 8, icon: 'bi-headphones', image: 'HEADSET LOGITECH.png', merk: 'Logitech' },
-        { name: '4K Webcam 1080P 60fps Mini Video Camera', cat: 'Elektronik', code: 'TRI-005', stockTotal: 15, icon: 'bi-camera-video', image: 'WEBCAM.jpg', merk: 'Webcam HD' },
-        { name: 'Epson EX3240 SVGA 3LCD Projector 3200', cat: 'Praktikum', code: 'MIK-006', stockTotal: 4, icon: 'bi-easel', image: 'PROYEKTOR EPSON.jpg', merk: 'Epson' },
-        { name: 'Kabel Black High Speed 1.4 Version Gold-Plated HDMI', cat: 'Peralatan Kantor', code: 'GLO-007', stockTotal: 20, icon: 'bi-usb-plug', image: 'kabel_hdmi.png', merk: 'HDMI' },
-        { name: 'Kabel 0.3m 1.5M 3m VGA To VGA Cable 15 Pin', cat: 'Peralatan Kantor', code: 'BOL-008', stockTotal: 10, icon: 'bi-plug', image: 'kabel vga.jpg', merk: 'VGA Cable' },
-        { name: 'Kabel LAN CAT6 UTP Cable Networking', cat: 'Peralatan Kantor', code: 'RKT-009', stockTotal: 6, icon: 'bi-ethernet', image: 'KABEL LAN.jpg', merk: 'CAT6' },
-        { name: 'Kabel HDMI to VGA Adapter Gold Plated', cat: 'Peralatan Kantor', code: 'PPT-010', stockTotal: 2, icon: 'bi-usb-c', image: 'KABEL HDMI TO VGA.jpg', merk: 'HDMI Adapter' },
-        { name: 'Pen Wireless Remote Controller Laser Pointer', cat: 'Elektronik', code: 'MS-011', stockTotal: 7, icon: 'bi-mouse', image: 'pointer.jpg', merk: 'Wireless Pointer' },
-        { name: 'Stop Kontak', cat: 'Elektronik', code: 'PRJ-012', stockTotal: 4, icon: 'bi-easel', image: 'STOP KONTAK.jpg', merk: 'StopKontak' },
-        { name: '2pcs Multifunctional network tester 468 network cable', cat: 'Peralatan Kantor', code: 'HDM-013', stockTotal: 14, icon: 'bi-usb-plug', image: 'LAN tester.jpg', merk: 'Network Tester' },
-        { name: 'Tang Crimping Tool RJ45 RJ11 HT-200R', cat: 'Peralatan Kantor', code: 'LAN-014', stockTotal: 9, icon: 'bi-ethernet', image: 'Tang crimping.jpg', merk: 'HT-200R' },
-        { name: 'JBL Boombox 3 Portable Rechargeable Splashproof Bluetooth', cat: 'Elektronik', code: 'ADP-015', stockTotal: 5, icon: 'bi-speaker', image: 'speaker portable.jpg', merk: 'JBL' }
-    ];
+    const userCatalogItems = [];
 
     let currentPage = 1;
     const itemsPerPage = 8;
@@ -43,7 +27,7 @@ function getMasterItems() {
             }
         } catch (e) {}
         
-        localStorage.setItem('sipibsMasterItems', JSON.stringify(userCatalogItems));
+        
         return userCatalogItems;
     }
 
@@ -166,7 +150,7 @@ tbody.innerHTML = pageItems.map((item, idx) => {
             const condClass = condition === 'Rusak' ? 'red' : (condition === 'Rusak Ringan' ? 'yellow' : 'green');
 
             let thumbHtml = `<i class="bi ${iconClass}"></i>`;
-            if (item.image && item.image.startsWith('http')) {
+            if (item.image && (item.image.startsWith('http') || item.image.startsWith('data:') || item.image.startsWith('/') || item.image.startsWith('storage/'))) {
                 thumbHtml = `<img src="${item.image}" alt="${item.name}">`;
             } else if (item.image) {
                 thumbHtml = `<img src="${window.SIPIBS_IMAGE_BASE || '/images/'}${item.image}" alt="${item.name}" onerror="this.onerror=null; this.parentNode.innerHTML='<i class=\\&quot;bi ${iconClass}\\&quot;></i>';">`;
@@ -287,7 +271,7 @@ tbody.innerHTML = pageItems.map((item, idx) => {
 
         let previewHtml = `<i class="bi ${iconClass}"></i>`;
         if (item.image) {
-            const src = item.image.startsWith('http') ? item.image : (window.SIPIBS_IMAGE_BASE || '/images/') + item.image;
+            const src = (item.image.startsWith('http') || item.image.startsWith('data:') || item.image.startsWith('/') || item.image.startsWith('storage/')) ? item.image : (window.SIPIBS_IMAGE_BASE || '/images/') + item.image;
             previewHtml = `<img src="${src}" alt="${item.name}" onerror="this.onerror=null; this.parentNode.innerHTML='<i class=\\&quot;bi ${iconClass}\\&quot;></i>';">`;
         }
 
@@ -300,6 +284,12 @@ tbody.innerHTML = pageItems.map((item, idx) => {
         document.getElementById('detailStatus').textContent = status.label;
         document.getElementById('detailKondisi').textContent = item.condition || 'Baik';
 
+        const preview = document.querySelector('#detailItemPreview img');
+        if (preview) {
+            preview.style.cursor = 'zoom-in';
+            preview.title = 'Klik untuk membuka foto asli';
+            preview.onclick = function () { window.open(this.src, '_blank', 'noopener'); };
+        }
         document.getElementById('detailItemModalOverlay').classList.add('active');
     }
 
@@ -372,9 +362,56 @@ tbody.innerHTML = pageItems.map((item, idx) => {
         if (event.target === this) closeDetailModal();
     });
 
+    document.getElementById('btnChangeDetailPhoto').addEventListener('click', function () {
+        document.getElementById('detailItemPhotoInput').click();
+    });
+
+    document.getElementById('detailItemPhotoInput').addEventListener('change', async function () {
+        const photoFile = this.files[0];
+        if (!photoFile) return;
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(photoFile.type) || photoFile.size > 2 * 1024 * 1024) {
+            alert('Foto harus JPG, PNG, atau WEBP dengan ukuran maksimal 2 MB.');
+            this.value = '';
+            return;
+        }
+
+        const itemCode = document.getElementById('detailCode').textContent;
+        const item = getMasterItems().find(function (row) { return row.code === itemCode; });
+        if (!item || !item.inventoryId) {
+            alert('Data barang belum tersinkron. Refresh halaman lalu coba lagi.');
+            this.value = '';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('photo_file', photoFile);
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        try {
+            const response = await fetch((window.__apiBase || '/api').replace(/\/+$/, '') + '/inventaris/' + item.inventoryId + '/photo', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(function () { return {}; });
+                throw new Error(error.message || 'Gagal menyimpan foto barang.');
+            }
+            const saved = await response.json();
+            item.image = saved.item?.photo || '';
+            saveMasterItems(getMasterItems());
+            renderTable();
+            openDetailModal(itemCode);
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            this.value = '';
+        }
+    });
+
 
     function openAddItemModal() {
         document.getElementById('addItemForm').reset();
+        document.getElementById('addItemImageName').textContent = 'Pilih foto barang dari komputer';
         document.getElementById('addItemModalOverlay').classList.add('active');
         setTimeout(function () { document.getElementById('addItemName').focus(); }, 50);
     }
@@ -383,13 +420,32 @@ tbody.innerHTML = pageItems.map((item, idx) => {
         document.getElementById('addItemModalOverlay').classList.remove('active');
     }
 
-    function saveNewItem() {
+    async function saveNewItem() {
         const name = document.getElementById('addItemName').value.trim();
         const code = document.getElementById('addItemCode').value.trim().toUpperCase();
         const cat = document.getElementById('addItemCategory').value;
         const merk = document.getElementById('addItemMerk').value.trim() || 'SIPIBS';
         const stockTotal = Math.max(0, parseInt(document.getElementById('addItemStock').value) || 0);
-        const image = document.getElementById('addItemImage').value.trim();
+        const imageInput = document.getElementById('addItemImage');
+        const imageFile = imageInput.files[0];
+        let image = '';
+
+        if (imageFile) {
+            if (!['image/jpeg', 'image/png', 'image/webp'].includes(imageFile.type)) {
+                alert('Foto harus berformat JPG, PNG, atau WEBP.');
+                return;
+            }
+            if (imageFile.size > 2 * 1024 * 1024) {
+                alert('Ukuran foto maksimal 2 MB.');
+                return;
+            }
+            image = await new Promise(function (resolve, reject) {
+                const reader = new FileReader();
+                reader.onload = function () { resolve(reader.result); };
+                reader.onerror = reject;
+                reader.readAsDataURL(imageFile);
+            });
+        }
 
         if (!name || !code) {
             alert('Nama barang dan kode barang wajib diisi.');
@@ -413,6 +469,32 @@ icon: getItemIconClass(name, ''),
             condition: 'Baik'
         };
 
+                const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        try {
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('code', code);
+            formData.append('category', cat);
+            formData.append('brand', merk);
+            formData.append('stock', stockTotal);
+            if (imageFile) formData.append('photo_file', imageFile);
+
+            const response = await fetch((window.__apiBase || '/api') + '/inventaris', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.message || 'Gagal menyimpan barang ke database.');
+            }
+            const saved = await response.json();
+            newItem.inventoryId = saved.item?.id;
+            newItem.image = saved.item?.photo || '';
+        } catch (error) {
+            alert(error.message);
+            return;
+        }
         items.unshift(newItem);
         saveMasterItems(items);
 
@@ -430,13 +512,56 @@ icon: getItemIconClass(name, ''),
     document.getElementById('closeAddItemModal').addEventListener('click', closeAddItemModal);
     document.getElementById('btnCancelAddItem').addEventListener('click', closeAddItemModal);
     document.getElementById('btnSaveAddItem').addEventListener('click', saveNewItem);
+    document.getElementById('addItemImage').addEventListener('change', function () {
+        const label = document.getElementById('addItemImageName');
+        label.textContent = this.files[0] ? this.files[0].name : 'Pilih foto barang dari komputer';
+    });
     document.getElementById('addItemModalOverlay').addEventListener('click', function (event) {
         if (event.target === this) closeAddItemModal();
     });
 
+function mergeServerItems(serverItems) {
+        if (!serverItems || !serverItems.length) return;
+        const items = serverItems.map(function (src) {
+            const total = Math.max(parseInt(src.available_quantity, 10) || 0, parseInt(src.total_quantity, 10) || 0);
+            return {
+                name: src.name,
+                cat: src.category || 'Elektronik',
+                code: src.code,
+                stockTotal: total,
+                icon: getItemIconClass(src.name, ''),
+                image: src.photo || '',
+                merk: src.brand || 'SIPIBS',
+                condition: src.condition || 'Baik',
+                inventoryId: src.id
+            };
+        });
+        saveMasterItems(items);
+    }
+
     // Initial render
     renderTable();
+
+    // Live stock sync (server = source of truth)
+    function refreshServerStock() {
+        if (!window.syncStockFromServer) return;
+        window.syncStockFromServer(function (serverItems) {
+            mergeServerItems(serverItems);
+            renderTable();
+        });
+    }
+
+    refreshServerStock();
+    window.addEventListener('focus', refreshServerStock);
 
     // Listen to storage sync
     window.addEventListener('storage', renderTable);
 });
+
+
+
+
+
+
+
+

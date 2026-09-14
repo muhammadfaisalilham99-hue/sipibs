@@ -14,6 +14,8 @@
 @php
     $userName = Auth::check() ? Auth::user()->name : 'Siswa';
     $userRole = 'SISWA';
+    $identityDocument = Auth::check() ? Auth::user()->identity_document : null;
+    $identityIsImage = $identityDocument && preg_match('/\.(jpg|jpeg|png|webp)$/i', $identityDocument);
     $step = request('step', 1);
     $barangData = [
         'Mouse HP USB-2' => ['cat' => 'Elektronik', 'image' => 'mouse HP.png'],
@@ -32,11 +34,22 @@
         'Tang Crimping Tool RJ45 RJ11 HT-200R' => ['cat' => 'Peralatan Kantor', 'image' => 'Tang crimping.jpg'],
         'JBL Boombox 3 Portable Rechargeable Splashproof Bluetooth' => ['cat' => 'Elektronik', 'image' => 'speaker portable.jpg'],
     ];
+    $dbItems = \App\Models\InventoryItem::where("available_quantity",">",0)->orderBy("name")->get();
+    foreach ($dbItems as $dbItem) {
+        $cat = $dbItem->item_category_id ? optional(\Illuminate\Support\Facades\DB::table("item_categories")->find($dbItem->item_category_id))->name : "-";
+        if (!isset($barangData[$dbItem->name])) {
+            $barangData[$dbItem->name] = ["cat" => $cat ?: "-", "image" => $dbItem->photo];
+        }
+    }
     $barangOptions = array_keys($barangData);
     $selectedBarang = request('barang', '');
     $selectedBarangData = $barangData[$selectedBarang] ?? ['cat' => '-', 'image' => null];
-    $namaPeminjam = request('nama', '');
-    $nisPeminjam = request('nim', '');
+    $selectedImage = $selectedBarangData['image'] ?? null;
+$selectedImageUrl = $selectedImage ? (preg_match('/^(https?:\/\/|data:|\/)/i', $selectedImage) ? url($selectedImage) : url('images/' . rawurlencode($selectedImage) . '?v=3')) : url('images/no-image.svg');
+$selectedDbItem = \App\Models\InventoryItem::where('name', $selectedBarang)->first();
+    $defaultUser = Auth::user();
+    $namaPeminjam = request('nama', $defaultUser ? $defaultUser->name : '');
+    $nisPeminjam = request('nim', $defaultUser ? $defaultUser->identity_number : '');
     $jumlahPinjam = request('jumlah', '1');
     $tanggalPinjam = request('tgl_pinjam', '');
     $tanggalKembali = request('tgl_kembali', '');
@@ -85,9 +98,8 @@
                     </div>
                 </div>
             @else
-                <div class="search-box condition-search"><i class="bi bi-search"></i><input id="loanSearch" type="text" placeholder="Cari Inventaris.."></div>
             @endif
-            <div class="top-actions">
+            <div class="top-actions" style="margin-left:auto;">
                 @include('user.partials.notification-bell')
 
                 <div class="top-user">
@@ -114,26 +126,37 @@
                         <div class="form-grid-3">
                             <div class="form-group">
                                 <label>Nama Peminjam</label>
-                                <input type="text" class="form-control" id="input-name-pminjam" name="nama" value="{{ $namaPeminjam }}" placeholder="Masukkan nama lengkap" required>
+                                <input type="text" class="form-control" id="input-name-pminjam" name="nama" value="{{ $namaPeminjam }}" placeholder="Masukkan nama lengkap" required readonly style="background:#f1f5f9;cursor:not-allowed;">
                             </div>
                             <div class="form-group">
                                 <label>NIS / NIP</label>
-                                <input type="text" class="form-control" id="input-nis-pminjam" name="nim" value="{{ $nisPeminjam }}" placeholder="Masukkan NIS atau NIP" required>
+                                <input type="text" class="form-control" id="input-nis-pminjam" name="nim" value="{{ $nisPeminjam }}" placeholder="Masukkan NIS atau NIP" required readonly style="background:#f1f5f9;cursor:not-allowed;">
+                            </div>
+                            <div class="form-group">
+                                <label>KTP / Kartu Pelajar</label>
+                                <div class="form-control identity-document-loan" style="display:flex;align-items:center;gap:8px;background:#f8fafc;color:#003985;font-weight:600;">
+                                    <i class="bi bi-file-earmark-person"></i>
+                                    @if($identityDocument)
+                                        @if($identityIsImage)
+                                            <button type="button" class="identity-preview-trigger" data-identity-url="{{ $identityDocument }}" style="border:0;background:transparent;padding:0;cursor:pointer;"><img src="{{ $identityDocument }}" alt="KTP atau kartu pelajar" style="width:54px;height:34px;object-fit:cover;border-radius:4px;border:1px solid #cbd5e1;"></button>
+                                        @else
+                                            <a href="{{ $identityDocument }}" target="_blank" rel="noopener">Lihat dokumen terdaftar</a>
+                                        @endif
+                                    @else
+                                        <span style="color:#64748b;font-weight:400;">Dokumen belum tersedia</span>
+                                    @endif
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label>Tanggal Peminjaman</label>
-                                <div class="date-input-wrap">
-                                    <input type="date" class="form-control date-picker-input" name="tgl_pinjam" value="{{ $tanggalPinjam }}" required>
-                                    <i class="bi bi-calendar3 date-picker-icon"></i>
-                                </div>
+                                <input type="date" class="form-control" name="tgl_pinjam" value="{{ $tanggalPinjam }}" required>
                             </div>
-
                             <div class="form-group">
                                 <label>Pilih Barang</label>
                                 <select class="form-control" name="barang" required>
-                                    <option value="" disabled {{ $selectedBarang === '' ? 'selected' : '' }}>Pilih barang yang akan dipinjam</option>
+                                    <option value="" disabled {{ $selectedBarang === "" ? "selected" : "" }}>Pilih barang yang akan dipinjam</option>
                                     @foreach ($barangOptions as $barangOption)
-                                        <option value="{{ $barangOption }}" {{ $selectedBarang === $barangOption ? 'selected' : '' }}>{{ $barangOption }}</option>
+                                        <option value="{{ $barangOption }}" {{ $selectedBarang === $barangOption ? "selected" : "" }}>{{ $barangOption }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -143,10 +166,7 @@
                             </div>
                             <div class="form-group">
                                 <label>Tanggal Pengembalian</label>
-                                <div class="date-input-wrap">
-                                    <input type="date" class="form-control date-picker-input" name="tgl_kembali" value="{{ $tanggalKembali }}" required>
-                                    <i class="bi bi-calendar3 date-picker-icon"></i>
-                                </div>
+                                <input type="date" class="form-control" name="tgl_kembali" value="{{ $tanggalKembali }}" required>
                                 <small style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:0.78rem;color:#e11d48;font-weight:500;"><i class="bi bi-info-circle"></i> Maksimal peminjaman adalah 2 hari.</small>
                             </div>
 
@@ -167,32 +187,6 @@
                             <button type="submit" class="btn-primary-sipibs"><i class="bi bi-send"></i> Ajukan Peminjaman</button>
                         </div>
                     </form>
-                </div>
-
-                <!-- RIWAYAT PEMINJAMAN SAYA -->
-                <div class="peminjaman-card history-card">
-                    <div class="card-head-title">
-                        <i class="bi bi-clock-history"></i> <strong>Riwayat Peminjaman Saya</strong>
-                    </div>
-                    <table class="table-sipibs">
-                        <thead>
-                            <tr>
-                                <th>BARANG</th>
-                                <th>TANGGAL PINJAM</th>
-                                <th>TANGGAL KEMBALI</th>
-                                <th>STATUS</th>
-                                <th>AKSI</th>
-                            </tr>
-                        </thead>
-                        <tbody id="peminjaman-history-body">
-                        </tbody>
-                    </table>
-                    <div id="peminjaman-history-empty" style="display:none;text-align:center;padding:30px 20px;color:#888;">
-                        <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>Belum ada riwayat peminjaman.
-                    </div>
-                    <div id="peminjaman-history-footer" style="display:none;text-align:center;padding:16px 20px;border-top:1px solid #f0f0f0;margin-top:8px;">
-                        <a href="{{ url('/riwayat-pinjam') }}" style="display:inline-flex;align-items:center;gap:6px;color:#003985;font-size:13px;font-weight:700;text-decoration:none;">Lihat Semua <i class="bi bi-arrow-right"></i></a>
-                    </div>
                 </div>
 
             @elseif($step == 2)
@@ -342,7 +336,7 @@
                     <h3>Detail Peminjaman</h3>
                     <div class="detail-flex">
                         <div class="detail-image-preview">
-                                <img data-loan-field="image" src="{{ !empty($selectedBarangData['image']) ? url('images/' . rawurlencode($selectedBarangData['image']) . '?v=3') : url('images/no-image.svg') }}" alt="{{ $selectedBarang }}" onerror="this.onerror=null;this.src='{{ url('images/no-image.svg') }}';">
+                                <img data-loan-field="image" src="{{ $selectedImageUrl }}" alt="{{ $selectedBarang }}" onerror="this.onerror=null;this.src='{{ url('images/no-image.svg') }}';">
                             </div>
                         <div class="detail-info-grid">
                             <div class="info-row"><span>Nama Barang</span><strong>: {{ $selectedBarang }}</strong></div>
@@ -418,7 +412,7 @@
                 <span>Detail Peminjaman</span>
             </div>
             <div class="modal-detail-body">
-                <img data-loan-field="image" src="{{ !empty($selectedBarangData['image']) ? url('images/' . rawurlencode($selectedBarangData['image']) . '?v=3') : url('images/no-image.svg') }}" alt="{{ $selectedBarang }}" onerror="this.onerror=null;this.src='{{ url('images/no-image.svg') }}';">
+                <img data-loan-field="image" src="{{ $selectedImageUrl }}" alt="{{ $selectedBarang }}" onerror="this.onerror=null;this.src='{{ url('images/no-image.svg') }}';">
                 <div class="modal-meta-grid">
                     <div><span>ID Peminjaman</span><strong class="badge-code-sm" data-loan-field="id">PMJ-2025-00067</strong></div>
                     <div><span>Nama Barang</span><strong data-loan-field="barang">{{ $selectedBarang }}</strong></div>
@@ -464,7 +458,7 @@
                 <span>Detail Peminjaman</span>
             </div>
             <div class="modal-detail-body">
-                <img data-loan-field="image" src="{{ !empty($selectedBarangData['image']) ? url('images/' . rawurlencode($selectedBarangData['image']) . '?v=3') : url('images/no-image.svg') }}" alt="{{ $selectedBarang }}" onerror="this.onerror=null;this.src='{{ url('images/no-image.svg') }}';">
+                <img data-loan-field="image" src="{{ $selectedImageUrl }}" alt="{{ $selectedBarang }}" onerror="this.onerror=null;this.src='{{ url('images/no-image.svg') }}';">
                 <div class="modal-meta-grid">
                     <div><span>Nama Barang</span><strong>: {{ $selectedBarang }}</strong></div>
                     <div><span>Kategori</span><strong>: {{ $selectedBarangData['cat'] }}</strong></div>
@@ -508,7 +502,7 @@
                 <span>Detail Peminjaman</span>
             </div>
             <div class="modal-detail-body">
-                <img data-loan-field="image" src="{{ !empty($selectedBarangData['image']) ? url('images/' . rawurlencode($selectedBarangData['image']) . '?v=3') : url('images/no-image.svg') }}" alt="{{ $selectedBarang }}" onerror="this.onerror=null;this.src='{{ url('images/no-image.svg') }}';">
+                <img data-loan-field="image" src="{{ $selectedImageUrl }}" alt="{{ $selectedBarang }}" onerror="this.onerror=null;this.src='{{ url('images/no-image.svg') }}';">
                 <div class="modal-meta-grid">
                     <div><span>ID Peminjaman</span><strong class="badge-code-sm" data-loan-field="id">PMJ-2025-00067</strong></div>
                     <div><span>Nama Barang</span><strong data-loan-field="barang">{{ $selectedBarang }}</strong></div>
@@ -630,26 +624,9 @@
         syncLoanModalData();
         document.getElementById('modal-' + id).classList.add('active');
     }
-
     function closeModal(id) {
         document.getElementById('modal-' + id).classList.remove('active');
     }
-
-    document.querySelectorAll('.date-picker-icon').forEach(function (icon) {
-        icon.addEventListener('click', function () {
-            var input = this.parentElement.querySelector('.date-picker-input');
-            if (!input) return;
-            if (typeof input.showPicker === 'function') {
-                try {
-                    input.showPicker();
-                } catch (e) {
-                    input.focus();
-                }
-            } else {
-                input.focus();
-            }
-        });
-    });
 
 
     const loanRequestData = {
@@ -657,12 +634,13 @@
         nama: @json($namaPeminjam),
         nis: @json($nisPeminjam),
         barang: @json($selectedBarang),
+        inventory_item_id: @json($selectedDbItem?->id),
         kategori: @json($selectedBarangData['cat']),
         jumlah: @json($jumlahPinjam),
         tanggalPinjam: @json($tanggalPinjamJson),
         tanggalKembali: @json($tanggalKembaliJson),
         keperluan: @json($keperluanPinjam),
-        image: @json(!empty($selectedBarangData['image']) ? url('images/' . rawurlencode($selectedBarangData['image']) . '?v=3') : url('images/no-image.svg')),
+        image: @json($selectedImageUrl),
         detailUrl: @json(url('/peminjaman-user?' . http_build_query($queryStep3))),
         downloadUrl: @json(url('/bukti-peminjaman?' . http_build_query($queryStep1)))
     };
@@ -701,10 +679,32 @@
         localStorage.removeItem('redirectedLoanToReturn');
     @endif
     @if($step == 3)
+        localStorage.removeItem('sipibsLoanDecision');
         const loanSubmitKey = 'sipibsLoanSubmitted:' + [loanRequestData.nama, loanRequestData.nis, loanRequestData.barang, loanRequestData.jumlah, loanRequestData.tanggalPinjam, loanRequestData.tanggalKembali].join('|');
         if (localStorage.getItem(loanSubmitKey) !== '1') {
+            fetch('{{ url('/api/peminjaman') }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                body: JSON.stringify({
+                    inventory_item_id: loanRequestData.inventory_item_id,
+                    quantity: Number(loanRequestData.jumlah || 1),
+                    borrow_date: loanRequestData.tanggalPinjam ? loanRequestData.tanggalPinjam.split('/').reverse().join('-') : null,
+                    due_date: loanRequestData.tanggalKembali ? loanRequestData.tanggalKembali.split('/').reverse().join('-') : null,
+                    purpose: loanRequestData.keperluan || null
+                })
+            }).then(function (response) {
+                if (!response.ok) throw new Error('Pengajuan peminjaman gagal disimpan.');
+                return response.json();
+            }).then(function (data) {
+                loanRequestData.borrowingId = data.borrowing && data.borrowing.id;
+                try {
+                    const req = JSON.parse(localStorage.getItem('sipibsLoanRequest') || '{}');
+                    req.borrowingId = loanRequestData.borrowingId;
+                    localStorage.setItem('sipibsLoanRequest', JSON.stringify(req));
+                } catch(e){}
+            }).catch(function (error) { console.error(error); });
             loanRequestData.id = 'PMJ-' + Date.now();
-            loanRequestData.status = 'Dipinjam';
+            loanRequestData.status = 'Menunggu';
             loanRequestData.submittedAt = new Date().toISOString();
             localStorage.setItem('sipibsLoanRequest', JSON.stringify(loanRequestData));
             localStorage.setItem('sipibsLoanDecision', JSON.stringify({
@@ -870,12 +870,54 @@
         return "bi-box-seam";
     }
 
-    function applyLoanDecisionStep() {
+        function applyLoanDecisionStep() {
+        // Reset tampilan ke default (Menunggu) agar tidak terjebak status lama
+        const resetUI = () => {
+            const step3Item = document.getElementById('step3-item');
+            const step3Icon = document.getElementById('step3-icon');
+            const step3Label = document.getElementById('step3-label');
+            if (step3Item) step3Item.className = 'step-item';
+            if (step3Icon) step3Icon.innerHTML = '3';
+            if (step3Label) step3Label.textContent = 'Proses Peminjaman';
+
+            const statusClock = document.getElementById('status-clock');
+            if (statusClock) { 
+                statusClock.innerHTML = '<i class="bi bi-clock-history"></i>'; 
+                statusClock.style.backgroundColor = '';
+                statusClock.style.color = '';
+                statusClock.className = 'circle-icon';
+            }
+            const statusTitle = document.getElementById('status-title');
+            if (statusTitle) { statusTitle.textContent = 'Menunggu Persetujuan'; statusTitle.className = ''; }
+            const statusDesc = document.getElementById('status-desc');
+            if (statusDesc) statusDesc.textContent = 'Pengajuan Anda sedang diperiksa oleh admin.';
+
+            // Reset Timeline
+            const resetFlow = (id, dot, line, txt, sml) => {
+                const s = document.getElementById(id);
+                const d = document.getElementById(dot);
+                const l = document.getElementById(line);
+                if (s) s.className = 'flow-step';
+                if (d) d.innerHTML = '';
+                if (l) l.className = 'flow-line';
+                if (s) {
+                    const st = s.querySelector('strong'); if (st) st.textContent = txt;
+                    const sm = s.querySelector('small'); if (sm) sm.textContent = sml;
+                }
+            };
+            resetFlow('flow-step-2', 'flow-dot-2', 'flow-line-1', 'Menunggu Persetujuan Admin', 'Sedang diproses');
+            resetFlow('flow-step-3', 'flow-dot-3', 'flow-line-2', 'Persetujuan', 'Menunggu keputusan');
+        };
+        resetUI();
         const decision = (function () {
             try { return JSON.parse(localStorage.getItem('sipibsLoanDecision') || 'null'); }
             catch (e) { return null; }
         })();
-        const status = decision && decision.status ? decision.status : 'pending';
+                let status = 'pending';
+        // Hanya pakai status tersimpan jika ID-nya cocok dengan ID yang sedang diajukan
+        if (decision && decision.status) {
+            status = decision.status;
+        }
 
         const step3Item = document.getElementById('step3-item');
         const step3Icon = document.getElementById('step3-icon');
@@ -904,6 +946,21 @@
         }
     }
 
+    function setFlowRejected(stepId, dotId, lineId, strongText, smallText) {
+        const step = document.getElementById(stepId);
+        const dot = document.getElementById(dotId);
+        const line = document.getElementById(lineId);
+        if (step) step.className = 'flow-step rejected';
+        if (dot) dot.innerHTML = '<i class="bi bi-x"></i>';
+        if (line) line.className = 'flow-line active rejected';
+        if (step) {
+            const strong = step.querySelector('strong');
+            if (strong && strongText) strong.textContent = strongText;
+            const small = step.querySelector('small');
+            if (small && smallText) small.textContent = smallText;
+        }
+    }
+
     function setFlowDone(stepId, dotId, lineId, strongText, smallText) {
         const step = document.getElementById(stepId);
         const dot = document.getElementById(dotId);
@@ -919,30 +976,68 @@
         }
     }
 
+    function syncStatusFromDatabase() {
+        fetch('{{ url('/api/peminjaman/saya') }}', {
+            headers: { 'Accept': 'application/json' }
+        }).then(function (res) { return res.json(); }).then(function (data) {
+            if (!data || !Array.isArray(data.borrowings) || !data.borrowings.length) return;
+            // Cocokkan berdasarkan ID pengajuan. Nama barang tidak unik.
+            if (!loanRequestData.borrowingId) return;
+            const match = data.borrowings.find(function (b) {
+                return Number(b.id) === Number(loanRequestData.borrowingId);
+            });
+            if (!match) return;
+            let status = 'pending';
+            const dbStatus = String(match.status || '').toLowerCase();
+            if (dbStatus === 'dipinjam' || dbStatus === 'disetujui' || dbStatus === 'approved') status = 'approved';
+            else if (dbStatus === 'ditolak' || dbStatus === 'rejected') status = 'rejected';
+            
+            localStorage.setItem('sipibsLoanDecision', JSON.stringify({
+                status: status,
+                request: Object.assign({}, loanRequestData, {
+                    id: match.id ? ('PMJ-' + match.id) : loanRequestData.id,
+                    borrowingId: match.id,
+                    barang: match.barang,
+                    status: match.status
+                }),
+                decidedAt: new Date().toISOString()
+            }));
+            applyLoanDecisionStep();
+        }).catch(function (err) { console.error('Sync error:', err); });
+    }
+    syncStatusFromDatabase();
+    setInterval(syncStatusFromDatabase, 2000);
+
     try { applyLoanDecisionStep(); } catch (e) {}
     window.addEventListener('storage', function (event) {
         if (event.key === 'sipibsLoanDecision' || event.key === 'sipibsLoanHistory' || event.key === 'sipibsLoanRequest') {
             try { applyLoanDecisionStep(); } catch (e) {}
         }
     });
-
 </script>
 <script src="{{ asset('js/user-notification.js') }}?v=5"></script>
 @include('user.partials.profile-sync')
+
+<div id="identityPreviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;padding:24px;" role="dialog" aria-modal="true" aria-label="Pratinjau KTP atau kartu pelajar">
+    <div style="position:relative;background:#fff;border-radius:12px;padding:16px;max-width:90vw;max-height:90vh;">
+        <button type="button" id="closeIdentityPreview" aria-label="Tutup" style="position:absolute;right:8px;top:8px;border:0;background:#fff;border-radius:50%;font-size:22px;width:34px;height:34px;cursor:pointer;">&times;</button>
+        <img id="identityPreviewImage" src="" alt="Pratinjau KTP atau kartu pelajar" style="display:block;max-width:80vw;max-height:80vh;object-fit:contain;">
+    </div>
+</div>
 <script>
-(function () {
-    try {
-        var profile = JSON.parse(localStorage.getItem('sipibs_user_profile') || 'null');
-        var accName = (profile && (profile.name || profile.username || '').trim()) || '';
-        var accNis = (profile && (profile.nis || '').trim()) || '';
-        var nameInput = document.getElementById('input-name-pminjam');
-        var nisInput = document.getElementById('input-nis-pminjam');
-        if (nameInput && accName) nameInput.value = accName;
-        if (nisInput && accNis) nisInput.value = accNis;
-    } catch (e) {}
-})();
-</script>
-</body>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('identityPreviewModal');
+    const image = document.getElementById('identityPreviewImage');
+    const close = () => { modal.style.display = 'none'; image.src = ''; };
+    document.querySelectorAll('.identity-preview-trigger').forEach(button => button.addEventListener('click', function () {
+        image.src = this.dataset.identityUrl;
+        modal.style.display = 'flex';
+    }));
+    document.getElementById('closeIdentityPreview').addEventListener('click', close);
+    modal.addEventListener('click', event => { if (event.target === modal) close(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
+});
+</script></body>
 </html>
 
 

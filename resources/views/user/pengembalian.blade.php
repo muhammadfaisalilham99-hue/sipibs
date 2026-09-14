@@ -22,8 +22,6 @@
         .return-page-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:24px; }
         .return-page-head h1 { color:#003f8f; font-size:24px; font-weight:800; line-height:1.2; letter-spacing:-.02em; }
         .return-page-head p { color:#475569; font-size:14px; margin-top:4px; }
-        .return-print-btn { display:inline-flex; align-items:center; gap:8px; height:38px; padding:0 16px; border:1px solid #0055c8; border-radius:8px; background:#fff; color:#0055c8; font-size:.82rem; font-weight:700; text-decoration:none; cursor:pointer; font-family:inherit; transition:background .15s ease; }
-        .return-print-btn:hover { background:#eef7ff; }
         .return-page-content { background:#f4f8fc; padding:28px 36px 48px; min-height:calc(100vh - 74px); }
         .return-main-grid { display:grid; grid-template-columns:minmax(0, 1fr) 360px; align-items:start; gap:24px; }
         .return-left-col { display:flex; flex-direction:column; gap:22px; min-width:0; }
@@ -34,6 +32,8 @@
         .return-card-title i, .return-card-title.simple i { color:#0055c8; font-size:18px; }
         .return-pending-badge { background:#dbeafe; color:#1d4ed8; border-radius:999px; padding:4px 14px; font-size:12px; font-weight:700; display:inline-block; }
         .return-table-wrap, .return-table.history { width:100%; border-collapse:collapse; }
+        .return-history-toggle { display:block; margin:14px auto 0; border:0; background:none; color:#0055c8; font-size:13px; font-weight:700; cursor:pointer; }
+        .return-history-toggle:hover { text-decoration:underline; }
         .return-table-wrap th, .return-table.history th { padding:12px 14px; border-top:none; border-bottom:1px solid #f1f5f9; color:#64748b; font-size:11px; font-weight:700; text-align:left; text-transform:uppercase; letter-spacing:.05em; }
         .return-table-wrap td, .return-table.history td { padding:14px; border-bottom:1px solid #f1f5f9; color:#334155; font-size:13px; vertical-align:middle; }
         .return-table-wrap tr:last-child td, .return-table.history tr:last-child td { border-bottom:none; }
@@ -59,7 +59,10 @@
         .return-cond-pill.warn { background:#ffedd5; color:#c2410c; }
         .return-cond-pill.bad { background:#fee2e2; color:#dc2626; }
         .return-cond-pill .cond-symbol { font-size:10px; line-height:1; }
-        .return-status-pill.done { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border:1px solid #bfdbfe; border-radius:6px; background:#eff6ff; color:#2563eb; font-size:11px; font-weight:700; }
+        .return-status-pill.done { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border:0; border-radius:999px; font-size:11px; font-weight:700; }
+        .return-status-pill.done.status-fine { background:#ffedd5; color:#ea580c; }
+        .return-status-pill.done.status-problem { background:#fee2e2; color:#dc2626; }
+        .return-status-pill.done.status-returned { background:#dcfce7; color:#16a34a; }
         .return-status-pill.done i { font-size:12px; }
         .return-empty { text-align:center; padding:36px 20px; color:#94a3b8; font-size:13px; }
         .return-form-card { padding:24px 26px; border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
@@ -117,7 +120,27 @@
         .return-modal-actions { display:flex; gap:10px; justify-content:center; }
         .return-modal-actions button, .return-modal-actions a { flex:1; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-family:inherit; }
     </style>
-</head>
+    @php
+        $serverReturnItems = \App\Models\Borrowing::with(['item', 'returnRecords' => fn ($query) => $query->latest('id')])
+            ->where('user_id', auth()->id())
+            ->whereIn('status', ['menunggu', 'dipinjam', 'disetujui'])
+            ->whereDoesntHave('returnRecords', fn ($query) => $query->where('status', 'diterima'))
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn ($borrowing) => [
+                'id' => $borrowing->id,
+                'borrowing_id' => $borrowing->id,
+                'barang' => optional($borrowing->item)->name,
+                'serial' => optional($borrowing->item)->code,
+                'jumlah' => $borrowing->quantity,
+                'tanggalPinjam' => optional($borrowing->borrow_date)->format('Y-m-d'),
+                'tanggalKembali' => optional($borrowing->due_date)->format('Y-m-d'),
+                'status' => $borrowing->status,
+                'return_status' => optional($borrowing->returnRecords->first())->status,
+                'image' => optional($borrowing->item)->photo,
+            ])
+            ->values();
+    @endphp</head>
 <body>
 @php
     $userName = Auth::check() ? Auth::user()->name : 'Admin SIPIBS';
@@ -179,8 +202,8 @@
 
     <main class="main-area">
         <header class="topbar">
-            <div class="search-box condition-search"><i class="bi bi-search"></i><input id="returnSearch" type="text" placeholder="Cari inventaris..."></div>
-            <div class="top-actions">
+
+            <div class="top-actions" style="margin-left:auto;">
                 @include('user.partials.notification-bell')
                 <div class="top-user">
                     <div><strong id="top-user-name">{{ $userName }}</strong><span>{{ $userRole }}</span></div>
@@ -195,7 +218,7 @@
                     <h1>Pengembalian Barang</h1>
                     <p>Selesaikan proses peminjaman dengan mendata kondisi barang yang dikembalikan.</p>
                 </div>
-                <button class="return-print-btn" type="button" onclick="window.print()"><i class="bi bi-printer"></i> Cetak Laporan</button>
+
             </div>
 
             <div class="return-main-grid">
@@ -203,7 +226,7 @@
                     <div class="return-card return-list-card">
                         <div class="return-card-title">
                             <div><i class="bi bi-box-seam-fill"></i> Barang Perlu Dikembalikan</div>
-                            <span id="return-pending-count" class="return-pending-badge">4 Tertunda</span>
+                            <span id="return-pending-count" class="return-pending-badge">0 Tertunda</span>
                         </div>
                         <div class="return-list-wrap">
                             <table class="return-table-wrap">
@@ -311,67 +334,13 @@
                                     <th>Status</th>
                                 </tr>
                             </thead>
-                            <tbody id="return-history-body">
-                                <tr>
-                                    <td>
-                                        <strong>Laptop Dell Precision 3561</strong>
-                                        <small style="display:block;color:#64748b;font-size:11.5px;margin-top:2px;">Inv: LP-001-2023</small>
-                                    </td>
-                                    <td>22 Oct 2023</td>
-                                    <td><span class="return-cond-pill good"><span class="cond-symbol">●</span> Baik</span></td>
-                                    <td style="color:#475569;font-size:12.5px;max-width:240px;line-height:1.35;">"Kondisi mulus, data sudah di-clear."</td>
-                                    <td><span class="return-status-pill done"><i class="bi bi-check-circle"></i> Selesai</span></td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <strong>Tripod Excell Promon 500</strong>
-                                        <small style="display:block;color:#64748b;font-size:11.5px;margin-top:2px;">Inv: TR-005-2023</small>
-                                    </td>
-                                    <td>20 Oct 2023</td>
-                                    <td><span class="return-cond-pill warn"><span class="cond-symbol">▪</span> Rusak Ringan</span></td>
-                                    <td style="color:#475569;font-size:12.5px;max-width:240px;line-height:1.35;">"Kunci kaki tripod agak longgar."</td>
-                        </div>
-                    </div>
-
-                    <div class="return-card return-history-card">
-                        <div class="return-card-title simple"><i class="bi bi-arrow-counterclockwise"></i> Riwayat Pengembalian Terbaru</div>
-                        <table class="return-table history">
-                            <thead>
-                                <tr>
-                                    <th>Barang Kembali</th>
-                                    <th>Tanggal Kembali</th>
-                                    <th>Kondisi</th>
-                                    <th>Catatan Admin</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="return-history-body">
-                                <tr>
-                                    <td>
-                                        <strong>Laptop Dell Precision 3561</strong>
-                                        <small style="display:block;color:#64748b;font-size:11.5px;margin-top:2px;">Inv: LP-001-2023</small>
-                                    </td>
-                                    <td>22 Oct 2023</td>
-                                    <td><span class="return-cond-pill good"><span class="cond-symbol">●</span> Baik</span></td>
-                                    <td style="color:#475569;font-size:12.5px;max-width:240px;line-height:1.35;">"Kondisi mulus, data sudah di-clear."</td>
-                                    <td><span class="return-status-pill done"><i class="bi bi-check-circle"></i> Selesai</span></td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <strong>Tripod Excell Promon 500</strong>
-                                        <small style="display:block;color:#64748b;font-size:11.5px;margin-top:2px;">Inv: TR-005-2023</small>
-                                    </td>
-                                    <td>20 Oct 2023</td>
-                                    <td><span class="return-cond-pill warn"><span class="cond-symbol">▪</span> Rusak Ringan</span></td>
-                                    <td style="color:#475569;font-size:12.5px;max-width:240px;line-height:1.35;">"Kunci kaki tripod agak longgar."</td>
-                                    <td><span class="return-status-pill done"><i class="bi bi-check-circle"></i> Selesai</span></td>
-                                </tr>
-                            </tbody>
+                            <tbody id="return-history-body"></tbody>
                         </table>
+                        <button type="button" class="return-history-toggle" id="return-history-toggle" onclick="toggleReturnHistory()" hidden>Lihat Semua</button>
                     </div>
                 </div>
 
-                <aside class="return-card return-form-card" id="return-form-card" tabindex="-1">
+                <aside class="return-card return-form-card" id="return-form-card" tabindex="-1" hidden>
                     <h2><i class="bi bi-pencil-square"></i> Form Pengembalian</h2>
                     <p>Silakan pilih barang yang akan dikembalikan.</p>
                     <div class="return-selected-item" id="return-selected-item" hidden>
@@ -536,35 +505,8 @@
         function renderLoansFromHistory() {
             const body = document.getElementById('return-items-body');
             if (!body) return;
-            const defaults = Array.from(body.querySelectorAll('[data-id]')).map(row => ({
-                id: row.dataset.id,
-                barang: row.dataset.name,
-                serial: row.dataset.serial,
-                tanggalPinjam: row.dataset.pinjam,
-                tanggalKembali: row.dataset.batas,
-                status: 'Dipinjam'
-            }));
-            const seen = new Set();
-            const items = readLoanSource().concat(defaults).filter(item => {
-                const status = String(item.status || item.statusKey || 'Dipinjam').toLowerCase();
-                if (status === 'ditolak' || status === 'rejected') return false;
-                const key = String(item.id || item.borrowing_id || item.serial || item.barang || item.item || Math.random());
-                if (seen.has(key)) return false;
-                seen.add(key);
-                return true;
-            });
             body.innerHTML = '';
-            items.forEach(item => {
-                const name = item.barang || item.item || item.itemName || item.name || '-';
-                const id = item.id || item.borrowing_id || item.serial || name;
-                const serial = item.serial || item.kode || item.nis || id;
-                const pinjam = formatDate(item.tanggalPinjam || item.pinjam || item.startDate);
-                const batas = formatDate(item.tanggalKembali || item.kembali || item.dueDate || item.batas || item.endDate);
-                const icon = iconFor(name);
-                body.insertAdjacentHTML('beforeend', '<tr data-id="' + id + '" data-name="' + name + '" data-serial="' + serial + '" data-pinjam="' + pinjam + '" data-batas="' + batas + '" data-image="" data-icon="' + icon + '" data-from-history="1"><td><div class="return-item-meta"><span class="return-icon"><i class="bi ' + icon + '"></i></span><div><strong>' + name + '</strong><small>SN: ' + serial + '</small></div></div></td><td>' + pinjam + '</td><td><span class="return-due-date">' + batas + '</span>' + dueBadge(item.tanggalKembali || item.kembali || item.dueDate || item.batas || item.endDate) + '</td><td><button class="return-now-btn" type="button" onclick="return handleReturnNowClick(this);">Kembalikan Sekarang</button></td></tr>');
-            });
-            const badge = document.getElementById('return-pending-count');
-            if (badge) badge.textContent = items.length + ' Tertunda';
+            if (window.__returnApiLoaded) renderLatestReturnLoan();
         }
 
         renderLoansFromHistory();
@@ -598,6 +540,7 @@
             returnNameDisplay.setAttribute('value', itemName || 'Pilih barang dari daftar');
         }
 
+        formCard.hidden = false;
         formCard.classList.add('focused', 'selected-active', 'focus-pulse');
         formCard.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'center' });
         setTimeout(() => {
@@ -630,6 +573,7 @@
     });
 
     const IMG_BASE = "{{ asset('images') }}";
+    const APP_BASE = "{{ url('/') }}";
 
     window.__csrf = "{{ csrf_token() }}";
 
@@ -688,8 +632,10 @@
 
     function getReturnImageSrc(image) {
         if (!image) return '';
-        if (/^(https?:)?\/\//.test(image) || image.indexOf('data:image/') === 0) return image;
-        return IMG_BASE + '/' + encodeURIComponent(image) + '?v=3';
+        const value = String(image);
+        if (/^(https?:)?\/\//.test(value) || value.indexOf('data:image/') === 0) return value;
+        if (value.indexOf('/') === 0) return APP_BASE + value;
+        return IMG_BASE + '/' + value.split('/').map(encodeURIComponent).join('/') + '?v=3';
     }
 
     function parseReturnDate(dateValue) {
@@ -797,7 +743,8 @@
             serial: loan.serial || loan.kode || loan.id || '-',
             pinjam: formatReturnDate(startDate),
             batas: formatReturnDate(dueDate),
-            status: dueStatus.late ? 'TERLAMBAT' : 'SIAP DIKEMBALIKAN',
+            status: loan.return_status === 'menunggu' ? 'MENUNGGU KONFIRMASI' : (dueStatus.late ? 'TERLAMBAT' : 'SIAP DIKEMBALIKAN'),
+            returnPending: loan.return_status === 'menunggu',
             late: dueStatus.late,
             duePillHtml: dueStatus.pillHtml,
             icon: getItemIcon(itemName),
@@ -821,79 +768,10 @@
                 });
             }
         } catch (e) {}
-        if (history.length === 0) {
-            history = [
-                {
-                    id: 'B802931-B',
-                    nama: 'Ahmad Fauzi',
-                    nis: '220401001',
-                    barang: 'Kamera DSLR Canon EOS 80D',
-                    serial: 'B802931-B',
-                    kategori: 'Multimedia',
-                    jumlah: 1,
-                    tanggalPinjam: '24/10/2023',
-                    tanggalKembali: '26/10/2023',
-                    status: 'Dipinjam'
-                },
-                {
-                    id: 'OLY-X300',
-                    nama: 'Siti Rahma',
-                    nis: '220401002',
-                    barang: 'Mikroskop Binokuler Olympus',
-                    serial: 'OLY-X300',
-                    kategori: 'Laboratorium',
-                    jumlah: 1,
-                    tanggalPinjam: '25/10/2023',
-                    tanggalKembali: '28/10/2023',
-                    status: 'Dipinjam'
-                },
-                {
-                    id: 'LP-001-2023',
-                    nama: 'Budi Santoso',
-                    nis: '220401003',
-                    barang: 'Laptop Dell Precision 3561',
-                    serial: 'LP-001-2023',
-                    kategori: 'Komputer',
-                    jumlah: 1,
-                    tanggalPinjam: '15/10/2023',
-                    tanggalKembali: '22/10/2023',
-                    status: 'Dipinjam'
-                },
-                {
-                    id: 'TR-005-2023',
-                    nama: 'Citra Dewi',
-                    nis: '220401004',
-                    barang: 'Tripod Excell Promon 500',
-                    serial: 'TR-005-2023',
-                    kategori: 'Multimedia',
-                    jumlah: 1,
-                    tanggalPinjam: '14/10/2023',
-                    tanggalKembali: '20/10/2023',
-                    status: 'Dipinjam'
-                }
-            ];
-        }
-
-        let decision = null;
-        try { decision = JSON.parse(localStorage.getItem('sipibsLoanDecision') || 'null'); } catch (e) {}
-        let request = null;
-        try { request = JSON.parse(localStorage.getItem('sipibsLoanRequest') || 'null'); } catch (e) {}
-        const fallback = decision && decision.request ? decision.request : request;
-        let list = history.slice();
-        if (fallback && fallback.id && !list.some(loan => String(loan.id) === String(fallback.id))) {
-            list.unshift(fallback);
-        }
-        return list;
+        return history;
     }
 
-    function getStaticReturnedIds() {
-        try {
-            const list = JSON.parse(localStorage.getItem('sipibsStaticReturnedIds') || '[]');
-            return Array.isArray(list) ? list : [];
-        } catch (e) { return []; }
-    }
-
-    function getSubmittedReturnLoanIds() {
+        function getSubmittedReturnLoanIds() {
         try {
             const submissions = JSON.parse(localStorage.getItem('sipibsReturnSubmissions') || '[]');
             if (!Array.isArray(submissions)) return [];
@@ -908,175 +786,16 @@
     }
 
     function getDefaultBorrowedReturnLoans() {
-        return [
-            {
-                id: 'B802931-B',
-                nama: 'Ahmad Fauzi',
-                nis: 'B802931-B',
-                barang: 'Kamera DSLR Canon EOS 80D',
-                serial: 'B802931-B',
-                kategori: 'Multimedia',
-                jumlah: 1,
-                tanggalPinjam: '24/10/2023',
-                tanggalKembali: '26/10/2023',
-                status: 'Dipinjam'
-            },
-            {
-                id: 'OLY-X300',
-                nama: 'Siti Rahma',
-                nis: 'OLY-X300',
-                barang: 'Mikroskop Binokuler Olympus',
-                serial: 'OLY-X300',
-                kategori: 'Laboratorium',
-                jumlah: 1,
-                tanggalPinjam: '25/10/2023',
-                tanggalKembali: '28/10/2023',
-                status: 'Dipinjam'
-            },
-            {
-                id: 'LP-001-2023',
-                nama: 'Budi Santoso',
-                nis: 'LP-001-2023',
-                barang: 'Laptop Dell Precision 3561',
-                serial: 'LP-001-2023',
-                kategori: 'Komputer',
-                jumlah: 1,
-                tanggalPinjam: '15/10/2023',
-                tanggalKembali: '22/10/2023',
-                status: 'Dipinjam'
-            },
-            {
-                id: 'TR-005-2023',
-                nama: 'Citra Dewi',
-                nis: 'TR-005-2023',
-                barang: 'Tripod Excell Promon 500',
-                serial: 'TR-005-2023',
-                kategori: 'Multimedia',
-                jumlah: 1,
-                tanggalPinjam: '14/10/2023',
-                tanggalKembali: '20/10/2023',
-                status: 'Dipinjam'
-            },
-            {
-                id: 'PMJ-HS-025',
-                nama: 'gashima',
-                nis: '1234567890',
-                barang: 'Headset Logitech G 432 7.1',
-                serial: 'PMJ-HS-025',
-                kategori: 'Audio Visual',
-                jumlah: 1,
-                tanggalPinjam: '01 Sep 2026',
-                tanggalKembali: '01 Sep 2026',
-                status: 'Dipinjam'
-            },
-            {
-                id: 'PMJ-LAN-026',
-                nama: 'kentil',
-                nis: '1234567890',
-                barang: 'Kabel LAN CAT6 UTP Cable Networking',
-                serial: 'PMJ-LAN-026',
-                kategori: 'Peralatan Kantor',
-                jumlah: 1,
-                tanggalPinjam: '01 Sep 2026',
-                tanggalKembali: '03 Sep 2026',
-                status: 'Dipinjam'
-            },
-            {
-                id: 'PMJ-KBD-027',
-                nama: 'pentol',
-                nis: '1234567890',
-                barang: 'Keyboard NuPhy Air75',
-                serial: 'PMJ-KBD-027',
-                kategori: 'Elektronik',
-                jumlah: 1,
-                tanggalPinjam: '01 Sep 2026',
-                tanggalKembali: '03 Sep 2026',
-                status: 'Dipinjam'
-            },
-            {
-                id: 'PMJ-MOU-028',
-                nama: 'gashima',
-                nis: '1234567890',
-                barang: 'Mouse HP USB-2',
-                serial: 'PMJ-MOU-028',
-                kategori: 'Elektronik',
-                jumlah: 1,
-                tanggalPinjam: '01 Sep 2026',
-                tanggalKembali: '03 Sep 2026',
-                status: 'Dipinjam'
-            },
-            {
-                id: 'PMJ-PTR-029',
-                nama: 'isal',
-                nis: '1234567890',
-                barang: 'Pen Wireless Remote Controller Laser Pointer',
-                serial: 'PMJ-PTR-029',
-                kategori: 'Elektronik',
-                jumlah: 1,
-                tanggalPinjam: '31 Agu 2026',
-                tanggalKembali: '02 Sep 2026',
-                status: 'Dipinjam'
-            },
-            {
-                id: 'PMJ-VGA-030',
-                nama: 'vanto',
-                nis: '1234567890',
-                barang: 'Kabel 0.3m 1.5M 3m VGA To VGA Cable 15 Pin',
-                serial: 'PMJ-VGA-030',
-                kategori: 'Peralatan Kantor',
-                jumlah: 1,
-                tanggalPinjam: '31 Agu 2026',
-                tanggalKembali: '02 Sep 2026',
-                status: 'Dipinjam'
-            },
-            {
-                id: 'PMJ-CRP-031',
-                nama: 'gashima',
-                nis: '1234567890',
-                barang: 'Tang Crimping Tool RJ45 RJ11 HT-200R',
-                serial: 'PMJ-CRP-031',
-                kategori: 'Peralatan Kantor',
-                jumlah: 1,
-                tanggalPinjam: '31 Agu 2026',
-                tanggalKembali: '02 Sep 2026',
-                status: 'Dipinjam'
-            },
-            {
-                id: 'PMJ-HDM-032',
-                nama: 'gashima',
-                nis: '1234567890',
-                barang: 'Kabel Black High Speed 1.4 Version Gold-Plated HDMI',
-                serial: 'PMJ-HDM-032',
-                kategori: 'Peralatan Kantor',
-                jumlah: 1,
-                tanggalPinjam: '30 Agu 2026',
-                tanggalKembali: '01 Sep 2026',
-                status: 'Dipinjam'
-            }
-        ];
+        return [];
     }
 
     function isBorrowedLoan(loan) {
         if (!loan) return false;
         const status = String(loan.status || loan.statusKey || 'dipinjam').toLowerCase().trim();
-        if (status === 'rejected' || status === 'ditolak') return false;
-        
-        // Cek apakah tanggal pengembalian sudah lewat
-        const dueDate = loan.tanggalKembali || loan.endDate || loan.dueDate || loan.batas || loan.kembali || '';
-        const parsedDue = parseReturnDate(dueDate);
-        if (parsedDue) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            if (parsedDue.getTime() < today.getTime()) {
-                return true; // Tanggal lewat otomatis masuk
-            }
-        }
-        
-        // Jika status masih dipinjam / aktif / menunggu
-        if (status === 'dipinjam' || status === 'approved' || status === 'pending' || status === 'menunggu' || status === 'aktif') {
+        if (status === 'dipinjam' || status === 'disetujui' || status === 'approved' || status === 'aktif') {
             return true;
         }
-        return true;
+        return false;
     }
 
     function getReturnLoanRows(forceLoanId) {
@@ -1086,22 +805,9 @@
 
         const apiIds = apiItems.map(loan => String(loan.id || loan.borrowing_id || ''));
 
-        const rawHistory = getRawLoanHistory();
-        const historyItems = rawHistory
-            .filter(loan => isBorrowedLoan(loan))
-            .filter(loan => !apiIds.includes(String(loan.id || loan.borrowing_id || '')))
-            .map(loan => Object.assign({}, loan, { fromHistory: true }));
-
-        const defaultItems = getDefaultBorrowedReturnLoans()
-            .filter(loan => !historyItems.some(h => String(h.id || h.serial || '') === String(loan.id)))
-            .filter(loan => !apiIds.includes(String(loan.id)))
-            .map(loan => Object.assign({}, loan, { fromHistory: true }));
-
         const allCombined = [];
         const seen = new Set();
-
-        // Urutan: API items -> historyItems (pinjaman riwayat terbaru di atas) -> defaultItems
-        historyItems.concat(apiItems, defaultItems).forEach((loan, idx) => {
+        apiItems.forEach((loan, idx) => {
             const key = String(loan.id || loan.borrowing_id || ('loan-item-' + idx));
             if (!seen.has(key)) {
                 seen.add(key);
@@ -1112,14 +818,14 @@
         let base = allCombined.map(loan => buildReturnRow(loan));
 
         if (forceLoanId && !base.some(l => l.id === forceLoanId)) {
-            const target = apiItems.concat(historyItems, defaultItems).find(loan => String(loan.id || loan.borrowing_id) === String(forceLoanId));
+            const target = apiItems.find(loan => String(loan.id || loan.borrowing_id) === String(forceLoanId));
             if (target) base.push(buildReturnRow(target));
         }
         return base;
     }
 
     function saveLocalReturnSubmission(id, name, selectedRow, conditionLabel, note, photos, status) {
-        let borrowerName = {{ json_encode($userName) }};
+        let borrowerName = @json($userName);
         try {
             const profile = JSON.parse(localStorage.getItem('sipibs_user_profile') || 'null');
             if (profile && (profile.name || profile.nama)) {
@@ -1201,31 +907,44 @@
     }
 
     function loadReturnItemsFromApi() {
-        return fetch('/api/pengembalian/items', {
-            method: 'GET',
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-        })
-        .then(function (res) {
-            if (!res.ok) return null;
-            return res.json();
-        })
-        .then(function (data) {
-            let items = data && Array.isArray(data.items) ? data.items : [];
+        const headers = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+        const activeStatuses = ['menunggu', 'dipinjam', 'disetujui', 'approved', 'aktif'];
+        const applyItems = function (items) {
             window.__returnApiLoaded = true;
-            window.__returnApiItems = items;
+            window.__returnApiItems = Array.isArray(items) ? items : [];
             renderLatestReturnLoan();
             if (window.renderLoansFromHistory) window.renderLoansFromHistory();
-            return items;
-        })
-        .catch(function () {
-            window.__returnApiLoaded = true;
-            window.__returnApiItems = [];
-            renderLatestReturnLoan();
-            if (window.renderLoansFromHistory) window.renderLoansFromHistory();
-            return [];
-        });
+            return window.__returnApiItems;
+        };
+        return fetch('/api/pengembalian/items', { method: 'GET', headers: headers })
+            .then(function (res) {
+                if (!res.ok) throw new Error('return-items-failed');
+                return res.json();
+            })
+            .then(function (data) {
+                const items = data && Array.isArray(data.items) ? data.items : [];
+                if (items.length > 0) return applyItems(items);
+                return fetch('/api/peminjaman/saya', { method: 'GET', headers: headers })
+                    .then(function (res) { if (!res.ok) throw new Error('my-loans-failed'); return res.json(); })
+                    .then(function (data) {
+                        const loans = data && Array.isArray(data.borrowings) ? data.borrowings : [];
+                        return applyItems(loans.filter(function (loan) {
+                            return activeStatuses.includes(String(loan.status || '').toLowerCase());
+                        }));
+                    });
+            })
+            .catch(function () {
+                return fetch('/api/peminjaman/saya', { method: 'GET', headers: headers })
+                    .then(function (res) { if (!res.ok) throw new Error('my-loans-failed'); return res.json(); })
+                    .then(function (data) {
+                        const loans = data && Array.isArray(data.borrowings) ? data.borrowings : [];
+                        return applyItems(loans.filter(function (loan) {
+                            return activeStatuses.includes(String(loan.status || '').toLowerCase());
+                        }));
+                    })
+                    .catch(function () { return applyItems([]); });
+            });
     }
-
     function renderLatestReturnLoan() {
         const body = document.getElementById('return-items-body');
         if (!body) return;
@@ -1275,7 +994,7 @@
                     loan.duePillHtml +
                 '</td>' +
                 '<td>' +
-                    '<button class="return-now-btn" type="button" onclick="return handleReturnNowClick(this);">Kembalikan Sekarang</button>' +
+                    '<button class="return-now-btn" type="button" ' + (loan.returnPending ? 'disabled' : 'onclick=\"return handleReturnNowClick(this);\"') + '>' + (loan.returnPending ? 'Menunggu Konfirmasi' : 'Kembalikan Sekarang') + '</button>' +
                 '</td>';
             body.appendChild(tr);
         });
@@ -1295,25 +1014,38 @@
         pendingCount.textContent = rows.length + ' Tertunda';
     }
 
-    window.__returnApiItems = [];
-    window.__returnApiLoaded = false;
+    window.__returnApiItems = @json($serverReturnItems);
+    window.__returnApiLoaded = true;
     try { localStorage.removeItem('sipibsSelectedReturnId'); } catch (e) {}
     renderLatestReturnLoan();
     if (window.renderLoansFromHistory) window.renderLoansFromHistory();
     try { loadReturnItemsFromApi(); } catch (e) {}
     try { renderReturnHistory(); } catch (e) {}
 
+    window.__returnHistoryAll = false;
+
+    function toggleReturnHistory() {
+        window.__returnHistoryAll = !window.__returnHistoryAll;
+        paintHistoryBody(window.__returnHistoryData || []);
+    }
+
     function paintHistoryBody(combined) {
         const historyBody = document.getElementById('return-history-body');
+        const toggle = document.getElementById('return-history-toggle');
         if (!historyBody) return;
 
-        if (combined.length === 0) {
+        window.__returnHistoryData = Array.isArray(combined) ? combined : [];
+        const visibleRows = window.__returnHistoryAll ? window.__returnHistoryData : window.__returnHistoryData.slice(0, 3);
+        if (toggle) {
+            toggle.hidden = window.__returnHistoryData.length <= 3;
+            toggle.textContent = window.__returnHistoryAll ? 'Tampilkan Ringkasan' : 'Lihat Semua';
+        }
+        if (visibleRows.length === 0) {
             historyBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#888;">Belum ada riwayat pengembalian.</td></tr>';
             return;
         }
-
         historyBody.innerHTML = '';
-        combined.forEach(sub => {
+        visibleRows.forEach(sub => {
             const cond = sub.condition || 'Baik';
             let condClass = 'good';
             let condSymbol = '●';
@@ -1330,7 +1062,13 @@
             }
 
             const dateStr = sub.dateDisplay || (sub.submittedAt ? formatReturnDate(sub.submittedAt.split('T')[0]) : '-');
-            let statusLabel = sub.status || 'Selesai';
+            const rawStatus = String(sub.status || '').toLowerCase();
+            const isFine = rawStatus.includes('denda') || rawStatus.includes('fine');
+            const isProblem = rawStatus.includes('masalah') || rawStatus.includes('bermasalah') || rawStatus.includes('problem');
+            const isPending = rawStatus.includes('menunggu') || rawStatus.includes('pending') || rawStatus.includes('konfirmasi');
+            const statusClass = isPending ? 'pending' : (isFine ? 'status-fine' : (isProblem ? 'status-problem' : 'status-returned'));
+            const statusLabel = isPending ? 'Menunggu Konfirmasi' : (isFine ? 'Terkena Denda' : (isProblem ? 'Terdapat Masalah' : 'Dikembalikan'));
+            const statusIcon = isPending ? 'bi-clock-fill' : (isFine ? 'bi-exclamation-circle-fill' : (isProblem ? 'bi-x-circle-fill' : 'bi-check-circle-fill'));
             let noteContent = sub.note || '-';
             if (noteContent.startsWith('"') && noteContent.endsWith('"')) {
                 noteContent = noteContent.slice(1, -1);
@@ -1348,7 +1086,7 @@
                     '<td>' + dateStr + '</td>' +
                     '<td><span class="return-cond-pill ' + condClass + '"><span class="cond-symbol">' + condSymbol + '</span> ' + condLabel + '</span></td>' +
                     '<td style="color:#475569;font-size:12.5px;max-width:240px;line-height:1.35;">' + noteDisplay + '</td>' +
-                    '<td><span class="return-status-pill done"><i class="bi bi-check-circle"></i> ' + statusLabel + '</span></td>' +
+                    '<td><span class="return-status-pill done ' + statusClass + '"><i class="bi ' + statusIcon + '"></i> ' + statusLabel + '</span></td>' +
                 '</tr>'
             );
         });
@@ -1371,10 +1109,7 @@
             paintHistoryBody(list);
         })
         .catch(function () {
-            let submissions = [];
-            try { submissions = JSON.parse(localStorage.getItem('sipibsReturnSubmissions') || '[]'); } catch (e) {}
-            if (!Array.isArray(submissions)) submissions = [];
-            paintHistoryBody(submissions);
+            paintHistoryBody([]);
         });
     }
 
@@ -1424,6 +1159,7 @@
         applySelectedReturnItem(row, button);
         localStorage.setItem('sipibsSelectedReturnId', row.dataset.id || '');
         if (formCard) {
+            formCard.hidden = false;
             formCard.classList.add('focused');
             formCard.classList.add('selected-active');
             formCard.classList.remove('focus-pulse');
@@ -1792,7 +1528,9 @@
         let photos = [];
         try {
             if (selectedReturnPhotos && selectedReturnPhotos.length > 0) {
-                photos = await readReturnPhotosAsDataUrls();
+                photos = (await readReturnPhotosAsDataUrls())
+                    .map(function (photo) { return typeof photo === 'string' ? photo : photo.src; })
+                    .filter(Boolean);
             }
         } catch (e) {
             photos = [];
@@ -1804,10 +1542,6 @@
         }
 
         try {
-            if (selectedRow.dataset.fromHistory === '1') {
-                finishLocalReturn(id, name, selectedRow, conditionLabel, note, photos);
-                return;
-            }
 
             const res = await fetch('/api/pengembalian', {
                 method: 'POST',
@@ -1827,8 +1561,8 @@
             const data = await res.json().catch(() => ({}));
 
             if (!res.ok) {
-                finishLocalReturn(id, name, selectedRow, conditionLabel, note, photos);
-                return;
+                const message = data && data.message ? data.message : 'Pengembalian gagal dikirim ke admin.';
+                throw new Error(message);
             }
 
             if (data && data.return) {
@@ -1870,7 +1604,7 @@
             const modal = document.getElementById('return-success-modal');
             if (modal) modal.classList.add('active');
         } catch (err) {
-            finishLocalReturn(id, name, selectedRow, conditionLabel, note, photos);
+            showUserToast(err && err.message ? err.message : 'Pengembalian gagal dikirim ke admin.');
         } finally {
             if (submitBtn) submitBtn.disabled = false;
         }
@@ -1920,7 +1654,7 @@
         const modal = document.getElementById('return-success-modal');
         if (modal) modal.classList.remove('active');
         const formCard = document.getElementById('return-form-card');
-        if (formCard) formCard.classList.remove('focused');
+        if (formCard) { formCard.classList.remove('focused'); formCard.hidden = true; }
         updateReturnPendingCount();
         resetReturnForm();
     }
@@ -1947,6 +1681,13 @@
         event.stopPropagation();
         selectReturnItem(button);
     });
+
+    window.addEventListener('click', function (event) {
+        if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        const link = event.target.closest('.user-sidebar a[href]');
+        if (!link || link.getAttribute('href') === '#') return;
+        window.location.assign(link.href);
+    }, true);
 
     window.history.scrollRestoration = 'manual';
     window.scrollTo(0, 0);
@@ -2002,8 +1743,3 @@
 @include('user.partials.profile-sync')
 </body>
 </html>
-
-
-
-
-

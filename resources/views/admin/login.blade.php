@@ -18,10 +18,6 @@
             <p class="auth-subtitle">Sistem Inventaris &amp; Peminjaman Barang Sekolah</p>
         </section>
         <section class="auth-card" style="width:min(100%,410px);">
-            <div class="auth-tabs">
-                <a class="auth-tab" href="{{ url('/login-siswa') }}" style="display:grid;place-items:center;">Siswa / Guru</a>
-                <button class="auth-tab active">Admin</button>
-            </div>
             @if ($errors->any())
                 <div style="color:#dc2626;margin-bottom:14px;font-size:14px;">{{ $errors->first() }}</div>
             @endif
@@ -29,11 +25,11 @@
                 @csrf
                 <div class="form-row">
                     <label class="form-label" for="admin-email">Email Admin</label>
-                    <div class="field"><i class="bi bi-person"></i><input id="admin-email" name="email" type="email" value="{{ old('email') }}" placeholder="Masukkan email admin" required></div>
+                    <div class="field"><i class="bi bi-person"></i><input id="admin-email" name="email" type="email" value="{{ old('email') }}" placeholder="Masukkan email admin" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" required></div>
                 </div>
                 <div class="form-row">
                     <label class="form-label" for="admin-password">Kata Sandi</label>
-                    <div class="field"><i class="bi bi-lock"></i><input id="admin-password" name="password" type="password" placeholder="Masukkan kata sandi" required><i class="bi bi-eye eye" onclick="togglePassword(this)"></i></div>
+                    <div class="field"><i class="bi bi-lock"></i><input id="admin-password" name="password" type="password" placeholder="Masukkan kata sandi" autocomplete="current-password" readonly onfocus="this.removeAttribute('readonly')" required><i class="bi bi-eye eye" onclick="togglePassword(this)"></i></div>
                 </div>
                 <button class="primary-btn" type="submit">Masuk</button>
             </form>
@@ -51,4 +47,3 @@
     </script>
 </body>
 </html>
-

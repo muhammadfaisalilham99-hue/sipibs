@@ -30,6 +30,7 @@
             <a class="nav-item {{ $active === 'dashboard' ? 'active' : '' }}" href="{{ url('/dashboard-admin') }}"><i class="bi bi-house-fill"></i> Dashboard</a>
             <div class="menu-caption nav-caption">MASTER DATA</div>
             <a class="nav-item {{ $active === 'master' ? 'active' : '' }}" href="{{ url('/admin/data-master') }}"><i class="bi bi-box-seam-fill"></i> Data Master <span style="margin-left:auto;">›</span></a>
+            <a class="nav-item {{ $active === 'condition' ? 'active' : '' }}" href="{{ url('/admin/kondisi-barang') }}"><i class="bi bi-clipboard2-pulse-fill"></i> Kondisi Barang <span style="margin-left:auto;">›</span></a>
             <a class="nav-item {{ $active === 'user' ? 'active' : '' }}" href="{{ url('/admin/data-user') }}"><i class="bi bi-people-fill"></i> Data User <span style="margin-left:auto;">›</span></a>
             <div class="menu-caption nav-caption">TRANSAKSI</div>
             <a class="nav-item {{ $active === 'peminjaman' ? 'active' : '' }}" href="{{ url('/admin/peminjaman') }}"><i class="bi bi-journal-check"></i> Peminjaman <span style="margin-left:auto;">›</span></a>
@@ -45,13 +46,16 @@
     </aside>
 
     <main class="return-admin-main">
-        <header class="return-topbar">
-            <h1>Manajemen Pengembalian</h1>
-            <div class="return-search"><i class="bi bi-search"></i><input id="returnSearchInput" type="text" placeholder="Cari ID Peminjaman..."></div>
-            <div class="return-top-actions">
+        <header class="topbar">
+            <div class="page-label">Manajemen Pengembalian</div>
+            <div class="top-actions">
+                <div class="return-search" style="height:38px;"><i class="bi bi-search"></i><input id="returnSearchInput" type="text" placeholder="Cari ID Peminjaman..."></div>
                 @include('admin.partials.notification-bell')
-                <button type="button" class="top-icon-btn" id="helpTopBtn"><i class="bi bi-question-circle"></i></button>
-                <div class="return-admin-user"><div><strong>Admin SIPIBS(ical)</strong><span>Administrator</span></div><img class="return-avatar avatar-target" src="{{ asset('images/PROFIL.png') }}" alt="User"><i class="bi bi-chevron-down"></i></div>
+                
+                <div class="top-user">
+                    <div><strong id="top-user-name">Admin SIPIBS</strong><span>Administrator</span></div>
+                    <img class="top-avatar avatar-target" src="{{ asset('images/PROFIL.png') }}" alt="Admin">
+                </div>
             </div>
         </header>
 
@@ -127,10 +131,23 @@
 <div class="return-toast" id="returnToast"></div>
 <script>
     window.PENGEMBALIAN_DEFAULT_PHOTO = '{{ asset("images/PROYEKTOR EPSON.jpg") }}';
+    window.SIPIBS_API_BASE = '../api';
+    window.SIPIBS_CSRF = '{{ csrf_token() }}';
+    window.SIPIBS_PENDING_RETURNS = @json($pendingReturns ?? []);
 </script>
-<script src="{{ asset('js/admin-pengembalian.js') }}?v=22"></script>
+<script src="{{ asset('js/admin-pengembalian.js') }}?v=33"></script>
 @include('admin.partials.sidebar-scroll')
 @include('admin.partials.profile-sync')
 <script src="{{ asset('js/admin-notification.js') }}?v=2"></script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+

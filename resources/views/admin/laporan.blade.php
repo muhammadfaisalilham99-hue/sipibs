@@ -20,6 +20,7 @@
             @page { size: A4 portrait; margin: 14mm; }
             body, html { background:#fff !important; }
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body *, .app-shell, .main-area, .content, .admin-wrap { visibility:visible !important; }
             aside.sidebar, .topbar, .report-stats-grid, .report-actions, .notification-bell,
             .report-panel-search, .report-pager-row, .sidebar-scroll, .pager {
                 display:none !important;
@@ -66,7 +67,8 @@
             <a class="nav-item {{ $active === 'dashboard' ? 'active' : '' }}" href="{{ url('/dashboard-admin') }}"><i class="bi bi-house-fill"></i> Dashboard</a>
             <div class="menu-caption nav-caption">MASTER DATA</div>
             <a class="nav-item {{ $active === 'master' ? 'active' : '' }}" href="{{ url('/admin/data-master') }}"><i class="bi bi-box-seam-fill"></i> Data Master <span style="margin-left:auto;">›</span></a>
-<a class="nav-item {{ $active === 'user' ? 'active' : '' }}" href="{{ url('/admin/data-user') }}"><i class="bi bi-people-fill"></i> Data User <span style="margin-left:auto;">›</span></a>
+<a class="nav-item {{ $active === 'condition' ? 'active' : '' }}" href="{{ url('/admin/kondisi-barang') }}"><i class="bi bi-clipboard2-pulse-fill"></i> Kondisi Barang <span style="margin-left:auto;">›</span></a>
+            <a class="nav-item {{ $active === 'user' ? 'active' : '' }}" href="{{ url('/admin/data-user') }}"><i class="bi bi-people-fill"></i> Data User <span style="margin-left:auto;">›</span></a>
             <div class="menu-caption nav-caption">TRANSAKSI</div>
             <a class="nav-item {{ $active === 'peminjaman' ? 'active' : '' }}" href="{{ url('/admin/peminjaman') }}"><i class="bi bi-journal-check"></i> Peminjaman <span style="margin-left:auto;">›</span></a>
             <a class="nav-item {{ $active === 'pengembalian' ? 'active' : '' }}" href="{{ url('/admin/pengembalian') }}"><i class="bi bi-card-checklist"></i> Pengembalian <span style="margin-left:auto;">›</span></a>
@@ -372,3 +374,4 @@ renderTable();
 <script src="{{ asset('js/admin-notification.js') }}?v=2"></script>
 </body>
 </html>
+

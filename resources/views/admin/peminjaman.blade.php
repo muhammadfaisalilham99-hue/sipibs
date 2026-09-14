@@ -6,8 +6,10 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,7 +32,8 @@
             <a class="nav-item {{ $active === 'dashboard' ? 'active' : '' }}" href="{{ url('/dashboard-admin') }}"><i class="bi bi-house-fill"></i> Dashboard</a>
             <div class="menu-caption nav-caption">MASTER DATA</div>
             <a class="nav-item {{ $active === 'master' ? 'active' : '' }}" href="{{ url('/admin/data-master') }}"><i class="bi bi-box-seam-fill"></i> Data Master <span style="margin-left:auto;">›</span></a>
-<a class="nav-item {{ $active === 'user' ? 'active' : '' }}" href="{{ url('/admin/data-user') }}"><i class="bi bi-people-fill"></i> Data User <span style="margin-left:auto;">›</span></a>
+<a class="nav-item {{ $active === 'condition' ? 'active' : '' }}" href="{{ url('/admin/kondisi-barang') }}"><i class="bi bi-clipboard2-pulse-fill"></i> Kondisi Barang <span style="margin-left:auto;">›</span></a>
+            <a class="nav-item {{ $active === 'user' ? 'active' : '' }}" href="{{ url('/admin/data-user') }}"><i class="bi bi-people-fill"></i> Data User <span style="margin-left:auto;">›</span></a>
             <div class="menu-caption nav-caption">TRANSAKSI</div>
             <a class="nav-item {{ $active === 'peminjaman' ? 'active' : '' }}" href="{{ url('/admin/peminjaman') }}"><i class="bi bi-journal-check"></i> Peminjaman <span style="margin-left:auto;">›</span></a>
             <a class="nav-item {{ $active === 'pengembalian' ? 'active' : '' }}" href="{{ url('/admin/pengembalian') }}"><i class="bi bi-card-checklist"></i> Pengembalian <span style="margin-left:auto;">›</span></a>
@@ -49,7 +52,7 @@
             <div class="page-label">Peminjaman</div>
             <div class="top-actions">
                 @include('admin.partials.notification-bell')
-                <i class="bi bi-question-circle"></i>
+                
                 <div class="top-user">
                     <div><strong id="top-user-name">Admin</strong><span>Administrator</span></div>
                     <img class="top-avatar avatar-target" src="{{ asset('images/PROFIL.png') }}" alt="Admin">
@@ -114,9 +117,12 @@
 <script>
     window.PEMINJAMAN_DEFAULT_PHOTO = '{{ asset("images/PROYEKTOR EPSON.jpg") }}';
 </script>
-<script src="{{ asset('js/admin-peminjaman.js') }}?v=6"></script>
+<script>window.__apiBase = @json(rtrim(url('/api'), '/'));</script>
+
+<script src="{{ asset('js/admin-peminjaman.js') }}?v=20"></script>
 @include('admin.partials.sidebar-scroll')
 @include('admin.partials.profile-sync')
 <script src="{{ asset('js/admin-notification.js') }}?v=2"></script>
 </body>
 </html>
+

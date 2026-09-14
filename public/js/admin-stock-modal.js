@@ -54,14 +54,29 @@ document.addEventListener('DOMContentLoaded', function () {
         deleteTargetItem = null;
     }
 
-    function confirmDeleteItem() {
+    async function confirmDeleteItem() {
         if (!deleteTargetItem) return;
-        let items = getItems();
-        items = items.filter(function (item) { return item.code !== deleteTargetItem.code; });
-        saveItems(items);
-        localStorage.removeItem(historyKey(deleteTargetItem.code));
-        closeDeleteModal();
-        window.dispatchEvent(new Event('storage'));
+
+        const button = document.getElementById('btnConfirmDelete');
+        button.disabled = true;
+        try {
+            const response = await fetch((window.__apiBase || '/api').replace(/\/+$/, '') + '/inventaris/' + encodeURIComponent(deleteTargetItem.code), {
+                method: 'DELETE',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                },
+            });
+            if (!response.ok && response.status !== 404) throw new Error('Server menolak penghapusan');
+
+            saveItems(getItems().filter(function (item) { return item.code !== deleteTargetItem.code; }));
+            localStorage.removeItem(historyKey(deleteTargetItem.code));
+            window.location.reload();
+        } catch (error) {
+            alert('Barang gagal dihapus permanen.');
+        } finally {
+            button.disabled = false;
+        }
     }
 
     function getStock(name, fallback) {
@@ -173,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('btnStockSubmit').classList.add('subtract');
     });
 
-    document.getElementById('btnStockSubmit').addEventListener('click', function () {
+document.getElementById('btnStockSubmit').addEventListener('click', function () {
         if (!activeItem) return;
         const qty = parseInt(document.getElementById('stockQtyInput').value);
         if (!qty || qty <= 0) {
@@ -188,6 +203,36 @@ document.addEventListener('DOMContentLoaded', function () {
         const found = items.find(function (row) { return row.code === activeItem.code; });
         if (found) found.stockTotal = next;
         saveItems(items);
+
+        if (activeItem.inventoryId) {
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            fetch((window.__apiBase || '/api').replace(/\/+$/, '') + '/inventaris/' + activeItem.inventoryId + '/stock', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfMeta ? csrfMeta.content : ''
+                },
+                body: JSON.stringify({
+                    action: actionType,
+                    quantity: qty
+                })
+            })
+            .then(function (res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
+            .then(function (data) {
+                if (data && data.item && window.syncStockFromServer) {
+                    window.syncStockFromServer();
+                    window.dispatchEvent(new Event('storage'));
+                }
+            })
+            .catch(function () {
+                alert('Stok tersimpan lokal, tetapi gagal menyimpan ke server.');
+            });
+        }
 
         const now = new Date();
         const reason = document.getElementById('stockReasonInput').value.trim() || (actionType === 'add' ? 'Pembelian barang baru' : 'Pengurangan stok barang');
@@ -207,3 +252,4 @@ document.addEventListener('DOMContentLoaded', function () {
         window.dispatchEvent(new Event('storage'));
     });
 });
+

@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daftar Akun SIPIBS - Sistem Peminjaman & Inventaris Barang Sekolah</title>
+    <title>Daftar Akun SIPIBS - Sistem Peminjaman &amp; Inventaris Barang Sekolah</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -29,7 +29,7 @@
 
         .card-container {
             width: 100%;
-            max-width: 430px;
+            max-width: 440px;
             background: #ffffff;
             border-radius: 16px;
             box-shadow: 0 10px 30px rgba(2, 43, 105, 0.08);
@@ -75,11 +75,57 @@
         }
 
         .card-body-section {
-            padding: 20px 28px 28px 28px;
+            padding: 16px 28px 28px 28px;
+        }
+
+        .role-switch-container {
+            margin-bottom: 18px;
+        }
+
+        .role-switch-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 800;
+            color: #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 8px;
+        }
+
+        .role-switch {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background-color: #f1f6fb;
+            border: 1px solid #d0dfed;
+            border-radius: 10px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .role-btn {
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            font-size: 13px;
+            font-weight: 700;
+            color: #64748b;
+            border-radius: 7px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .role-btn.active {
+            background-color: #00337c;
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(0, 51, 124, 0.25);
         }
 
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 14px;
         }
 
         .form-label {
@@ -156,6 +202,16 @@
             box-shadow: 0 0 0 3px rgba(0, 51, 124, 0.1);
         }
 
+        select.form-input {
+            appearance: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            background-size: 12px;
+        }
+
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -166,8 +222,8 @@
             display: flex;
             align-items: flex-start;
             gap: 10px;
-            margin-top: 16px;
-            margin-bottom: 22px;
+            margin-top: 14px;
+            margin-bottom: 20px;
             cursor: pointer;
         }
 
@@ -284,9 +340,21 @@
             border-color: #00337c;
             background-color: #f8fafc;
         }
+
+        .teacher-only {
+            display: none;
+        }
+
+        body.mode-guru .student-only {
+            display: none !important;
+        }
+
+        body.mode-guru .teacher-only {
+            display: block !important;
+        }
     </style>
 </head>
-<body>
+<body class="{{ old('role', 'siswa') === 'guru' ? 'mode-guru' : '' }}">
 
     <div class="card-container">
         <div class="card-inner">
@@ -296,7 +364,7 @@
                     <img src="{{ asset('images/sipibs-logo-baru.png') }}" alt="SIPIBS Logo">
                 </div>
                 <h1 class="title">Daftar Akun SIPIBS</h1>
-                <p class="subtitle">Sistem Peminjaman & Inventaris Barang Sekolah</p>
+                <p class="subtitle">Sistem Peminjaman &amp; Inventaris Barang Sekolah</p>
             </div>
 
             <!-- Form Section -->
@@ -304,12 +372,26 @@
                 @if ($errors->any())
                     <div style="color:#dc2626;margin-bottom:14px;font-size:14px;">{{ $errors->first() }}</div>
                 @endif
-                <form action="{{ route('register.post') }}" method="POST">
+                <form action="{{ route('register.post') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     
+                    <!-- Masuk Sebagai -->
+                    <div class="role-switch-container">
+                        <label class="role-switch-label">Masuk Sebagai</label>
+                        <input type="hidden" name="role" id="role_input" value="{{ old('role', 'siswa') }}">
+                        <div class="role-switch">
+                            <button type="button" class="role-btn {{ old('role', 'siswa') === 'siswa' ? 'active' : '' }}" id="btn_role_siswa" onclick="setRole('siswa')">
+                                <i class="bi bi-mortarboard-fill"></i> Siswa
+                            </button>
+                            <button type="button" class="role-btn {{ old('role', 'siswa') === 'guru' ? 'active' : '' }}" id="btn_role_guru" onclick="setRole('guru')">
+                                <i class="bi bi-person-workspace"></i> Guru / Staff
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Nama Lengkap -->
                     <div class="form-group">
-                        <label class="form-label" for="name">Nama Lengkap</label>
+                        <label class="form-label" for="name" id="label_name">Nama Lengkap</label>
                         <div class="input-wrapper">
                             <span class="input-icon">
                                 <i class="bi bi-person"></i>
@@ -320,7 +402,7 @@
 
                     <!-- NIS / NIP -->
                     <div class="form-group">
-                        <label class="form-label" for="identity_number">NIS / NIP</label>
+                        <label class="form-label" for="identity_number" id="label_identity">NIS / NIP</label>
                         <div class="input-wrapper">
                             <span class="input-icon">
                                 <i class="bi bi-card-heading"></i>
@@ -329,7 +411,77 @@
                         </div>
                     </div>
 
-                    <!-- Alamat Email -->
+                                                            <!-- Upload KTP / Kartu Pelajar -->
+                    <div class="form-group">
+                        <label class="form-label" for="identity_document">Upload KTP / Kartu Pelajar</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">
+                                <i class="bi bi-file-earmark-person"></i>
+                            </span>
+                            <input type="file" id="identity_document" name="identity_document" class="form-input" accept="image/jpeg,image/png,application/pdf" required>
+                        </div>
+                        <small style="display:block;margin-top:5px;color:#64748b;font-size:11px;">JPG, PNG, atau PDF. Maksimal 5 MB.</small>
+                    </div>
+<!-- Kelas / Ruangan (Khusus Siswa) -->
+                    <div class="form-group student-only">
+                        <label class="form-label" for="class_name">Kelas / Ruangan</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">
+                                <i class="bi bi-mortarboard"></i>
+                            </span>
+                            <input type="text" id="class_name" name="class_name" class="form-input" value="{{ old('class_name') }}" placeholder="Masukkan Kelas / Ruangan">
+                        </div>
+                    </div>
+
+                    <!-- Mata Pelajaran (Khusus Guru) -->
+                    <div class="form-group teacher-only">
+                        <label class="form-label" for="subject">Mata Pelajaran / Bidang</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">
+                                <i class="bi bi-book"></i>
+                            </span>
+                            <input type="text" id="subject" name="subject" class="form-input" value="{{ old('subject') }}" placeholder="Contoh: Pemrograman Web / RPL">
+                        </div>
+                    </div>
+
+                    <!-- Ruang Kerja / Lab (Khusus Guru) -->
+                    <div class="form-group teacher-only">
+                        <label class="form-label" for="room_name">Ruang Kerja / Lab</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">
+                                <i class="bi bi-building"></i>
+                            </span>
+                            <input type="text" id="room_name" name="room_name" class="form-input" value="{{ old('room_name') }}" placeholder="Contoh: Lab Komputer 1 / Ruang Guru">
+                        </div>
+                    </div>
+
+                    <!-- Tanggal Lahir -->
+                    <div class="form-group">
+                        <label class="form-label" for="birth_date">Tanggal Lahir</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">
+                                <i class="bi bi-calendar3"></i>
+                            </span>
+                            <input type="date" id="birth_date" name="birth_date" class="form-input" value="{{ old('birth_date') }}">
+                        </div>
+                    </div>
+
+                    <!-- Jenis Kelamin -->
+                    <div class="form-group">
+                        <label class="form-label" for="gender">Jenis Kelamin</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">
+                                <i class="bi bi-gender-ambiguous"></i>
+                            </span>
+                            <select id="gender" name="gender" class="form-input">
+                                <option value="">Pilih Jenis Kelamin</option>
+                                <option value="Laki-laki" {{ old('gender') == 'Laki-laki' ? 'selected' : '' }}>Laki-laki</option>
+                                <option value="Perempuan" {{ old('gender') == 'Perempuan' ? 'selected' : '' }}>Perempuan</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Email -->
                     <div class="form-group">
                         <label class="form-label" for="email">Alamat Email</label>
                         <div class="input-wrapper">
@@ -340,7 +492,7 @@
                         </div>
                     </div>
 
-                    <!-- Kata Sandi & Konfirmasi -->
+                    <!-- Password Fields -->
                     <div class="grid-2">
                         <div class="form-group">
                             <label class="form-label" for="password">Kata Sandi</label>
@@ -348,7 +500,7 @@
                                 <span class="input-icon">
                                     <i class="bi bi-lock"></i>
                                 </span>
-                                <input type="password" id="password" name="password" class="form-input" placeholder="********" required>
+                                <input type="password" id="password" name="password" class="form-input" placeholder="********" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')" required>
                                 <button type="button" class="input-toggle" onclick="togglePassword('password', this)" aria-label="Tampilkan kata sandi">
                                     <i class="bi bi-eye"></i>
                                 </button>
@@ -361,7 +513,7 @@
                                 <span class="input-icon">
                                     <i class="bi bi-arrow-counterclockwise"></i>
                                 </span>
-                                <input type="password" id="password_confirmation" name="password_confirmation" class="form-input" placeholder="********" required>
+                                <input type="password" id="password_confirmation" name="password_confirmation" class="form-input" placeholder="********" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')" required>
                                 <button type="button" class="input-toggle" onclick="togglePassword('password_confirmation', this)" aria-label="Tampilkan konfirmasi kata sandi">
                                     <i class="bi bi-eye"></i>
                                 </button>
@@ -373,13 +525,13 @@
                     <label class="checkbox-container">
                         <input type="checkbox" name="terms" required>
                         <span class="checkbox-label">
-                            Saya menyetujui <a href="#">Syarat & Ketentuan</a> penggunaan sistem inventaris sekolah.
+                            Saya menyetujui <a href="#">Syarat &amp; Ketentuan</a> penggunaan sistem inventaris sekolah.
                         </span>
                     </label>
 
                     <!-- Submit Button -->
                     <button type="submit" class="btn-submit">
-                        Register <i class="bi bi-arrow-right"></i>
+                        Daftar Akun <i class="bi bi-arrow-right"></i>
                     </button>
 
                     <div class="footer-divider"></div>
@@ -387,7 +539,7 @@
                     <!-- Already have account -->
                     <div class="footer-text">Sudah memiliki akun?</div>
                     <div class="btn-login-wrapper">
-                        <a href="{{ url('/login-siswa') }}" class="btn-login">Masuk</a>
+                        <a href="{{ url('/login') }}" class="btn-login">Masuk</a>
                     </div>
                 </form>
             </div>
@@ -395,35 +547,40 @@
     </div>
 
     <script>
-        (function () {
-            function readJson(key, fallback) {
-                try {
-                    var v = JSON.parse(localStorage.getItem(key) || 'null');
-                    return v || fallback;
-                } catch (e) {
-                    return fallback;
-                }
+        function setRole(role) {
+            document.getElementById('role_input').value = role;
+            const btnSiswa = document.getElementById('btn_role_siswa');
+            const btnGuru = document.getElementById('btn_role_guru');
+            const labelIdentity = document.getElementById('label_identity');
+            const inputIdentity = document.getElementById('identity_number');
+            const labelName = document.getElementById('label_name');
+            const inputName = document.getElementById('name');
+
+            if (role === 'guru') {
+                document.body.classList.add('mode-guru');
+                btnGuru.classList.add('active');
+                btnSiswa.classList.remove('active');
+                labelIdentity.textContent = 'NIP / NUPTK';
+                inputIdentity.placeholder = 'Nomor Induk Pegawai';
+                labelName.textContent = 'Nama Lengkap & Gelar';
+                inputName.placeholder = 'Nama Lengkap beserta Gelar';
+            } else {
+                document.body.classList.remove('mode-guru');
+                btnSiswa.classList.add('active');
+                btnGuru.classList.remove('active');
+                labelIdentity.textContent = 'NIS / NIP';
+                inputIdentity.placeholder = 'Nomor Induk Siswa/Pegawai';
+                labelName.textContent = 'Nama Lengkap';
+                inputName.placeholder = 'Nama Lengkap';
             }
-            var form = document.querySelector('form[action*="register"]');
-            if (form) {
-                form.addEventListener('submit', function () {
-                    try {
-                        var name = (document.getElementById('name') || {}).value || '';
-                        var nis = (document.getElementById('identity_number') || {}).value || '';
-                        var email = (document.getElementById('email') || {}).value || '';
-                        if (name) {
-                            var profile = readJson('sipibs_user_profile', {});
-                            profile.name = name;
-                            if (nis) profile.nis = nis;
-                            if (email) profile.email = email;
-                            localStorage.setItem('sipibs_user_profile', JSON.stringify(profile));
-                        }
-                    } catch (e) {}
-                });
-            }
+        }
+
+        // Initialize state on page load
+        (function() {
+            var currentRole = document.getElementById('role_input').value || 'siswa';
+            setRole(currentRole);
         })();
-    </script>
-    <script>
+
         function togglePassword(inputId, btn) {
             const input = document.getElementById(inputId);
             const icon = btn.querySelector('i');
@@ -440,3 +597,5 @@
     </script>
 </body>
 </html>
+
+

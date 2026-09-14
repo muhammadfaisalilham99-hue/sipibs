@@ -11,27 +11,18 @@
     <link rel="stylesheet" href="{{ asset('css/sipibs-ui.css') }}?v=19">
 </head>
 <body>
+@include('user.partials.local-storage-cleanup')
 @php
     $userName = Auth::check() ? Auth::user()->name : 'Dina Atalia';
-    $items = [
-        'PRJ-001' => ['name' => 'Mouse HP USB-2', 'room' => 'Lab Komputer', 'cat' => 'Elektronik', 'icon' => 'bi-mouse'],
-        'CAM-002' => ['name' => 'Keyboard NuPhy Air75', 'room' => 'Lab Komputer', 'cat' => 'Elektronik', 'icon' => 'bi-keyboard'],
-        'LAP-003' => ['name' => 'Laptop Lenovo Ideapad Slim 3', 'room' => 'Lab Komputer', 'cat' => 'Elektronik', 'icon' => 'bi-laptop'],
-        'SPK-004' => ['name' => 'Headset Logitech G 432 7.1', 'room' => 'Lab Multimedia', 'cat' => 'Audio Visual', 'icon' => 'bi-headphones'],
-        'TRI-005' => ['name' => '4K Webcam 1080P 60fps Mini Video Camera', 'room' => 'Lab Multimedia', 'cat' => 'Elektronik', 'icon' => 'bi-camera-video'],
-        'MIK-006' => ['name' => 'Epson EX3240 SVGA 3LCD Projector 3200', 'room' => 'Ruang Kelas', 'cat' => 'Praktikum', 'icon' => 'bi-easel'],
-        'GLO-007' => ['name' => 'Kabel Black High Speed 1.4 Version Gold-Plated HDMI', 'room' => 'Gudang Inventaris', 'cat' => 'Peralatan Kantor', 'icon' => 'bi-usb-plug'],
-        'BOL-008' => ['name' => 'Kabel 0.3m 1.5M 3m VGA To VGA Cable 15 Pin', 'room' => 'Gudang Inventaris', 'cat' => 'Peralatan Kantor', 'icon' => 'bi-plug'],
-        'RKT-009' => ['name' => 'Kabel LAN CAT6 UTP Cable Networking', 'room' => 'Lab Jaringan', 'cat' => 'Peralatan Kantor', 'icon' => 'bi-ethernet'],
-        'PPT-010' => ['name' => 'Kabel HDMI to VGA Adapter Gold Plated', 'room' => 'Gudang Inventaris', 'cat' => 'Peralatan Kantor', 'icon' => 'bi-usb-c'],
-        'MS-011' => ['name' => 'Pen Wireless Remote Controller Laser Pointer', 'room' => 'Ruang Presentasi', 'cat' => 'Elektronik', 'icon' => 'bi-broadcast-pin'],
-        'PRJ-012' => ['name' => 'Stop Kontak', 'room' => 'Gudang Inventaris', 'cat' => 'Elektronik', 'icon' => 'bi-outlet'],
-        'HDM-013' => ['name' => '2pcs Multifunctional network tester 468 network cable', 'room' => 'Lab Jaringan', 'cat' => 'Peralatan Kantor', 'icon' => 'bi-router'],
-        'LAN-014' => ['name' => 'Tang Crimping Tool RJ45 RJ11 HT-200R', 'room' => 'Lab Jaringan', 'cat' => 'Peralatan Kantor', 'icon' => 'bi-tools'],
-        'ADP-015' => ['name' => 'JBL Boombox 3 Portable Rechargeable Splashproof Bluetooth', 'room' => 'Aula Sekolah', 'cat' => 'Elektronik', 'icon' => 'bi-speaker'],
+    $categoryNames = \Illuminate\Support\Facades\DB::table('item_categories')->pluck('name', 'id');
+    $inventoryItem = \App\Models\InventoryItem::where('code', $code)->first();
+    $item = [
+        'name' => $inventoryItem ? $inventoryItem->name : 'Barang Tidak Ditemukan',
+        'cat' => ($inventoryItem && isset($categoryNames[$inventoryItem->item_category_id])) ? $categoryNames[$inventoryItem->item_category_id] : 'Lainnya',
+        'photo' => $inventoryItem ? $inventoryItem->photo : null,
+        'history' => $inventoryItem ? $inventoryItem->conditionHistories : collect(),
     ];
-    $selectedCode = $code ?: 'PRJ-001';
-    $item = $items[$selectedCode] ?? $items['PRJ-001'];
+    $selectedCode = $code;
 @endphp
 <div class="app-shell">
     <aside class="sidebar user-sidebar">
@@ -62,7 +53,7 @@
             <div class="top-actions">
                 @include('user.partials.notification-bell')
 
-                <div class="top-user"><div><strong id="top-user-name">{{ $userName }}</strong><span>SISWA</span></div><img class="top-avatar" id="top-avatar" src="{{ asset('images/PROFIL.png') }}" alt="Avatar"></div>
+                <div class="top-user"><div><strong id="top-user-name">{{ $userName }}</strong><span>{{ Auth::check() && Auth::user()->role === 'guru' ? 'GURU' : 'SISWA' }}</span></div><img class="top-avatar" id="top-avatar" src="{{ asset('images/PROFIL.png') }}" alt="Avatar"></div>
             </div>
         </header>
         <section class="content catalog-page-content condition-page-content">
@@ -70,16 +61,22 @@
                 <div>
                     <div class="catalog-breadcrumb">Home <i class="bi bi-chevron-right"></i> Inventaris <i class="bi bi-chevron-right"></i> Kondisi Barang <i class="bi bi-chevron-right"></i> <span>Detail</span></div>
                     <h1>Detail Kondisi Barang</h1>
-                    <p>Informasi detail kondisi dan lokasi barang inventaris.</p>
+                    <p>Informasi detail kondisi barang inventaris.</p>
                 </div>
                 <div class="catalog-page-actions"><a class="filter-btn detail-back" href="{{ url('/kondisi-barang') }}"><i class="bi bi-arrow-left"></i> Kembali</a></div>
             </div>
             <div class="detail-condition-grid">
                 <div class="detail-condition-card main">
-                    <div class="detail-condition-hero"><i class="bi {{ $item['icon'] }}"></i></div>
+                    <div class="detail-condition-hero">
+                        @if($item['photo'])
+                            <img src="{{ (str_starts_with($item['photo'], 'http') || str_starts_with($item['photo'], '/') || str_starts_with($item['photo'], 'storage/')) ? $item['photo'] : asset('images/' . $item['photo']) }}" alt="{{ $item['name'] }}">
+                        @else
+                            <i class="bi bi-box-seam"></i>
+                        @endif
+                    </div>
                     <h2>{{ $item['name'] }}</h2>
                     <span class="condition-code">{{ $selectedCode }}</span>
-                    <p>{{ $item['room'] }} • {{ $item['cat'] }}</p>
+                    <p>{{ $item['cat'] }}</p>
 <span class="condition-badge green" id="detailConditionBadge"><i class="bi bi-circle-fill"></i> BAIK</span>
                 </div>
                 <div class="detail-condition-card">
@@ -92,12 +89,17 @@
             </div>
             <div class="condition-table-card detail-history-card">
                 <h3>Riwayat Kondisi</h3>
-                <table class="admin-table condition-table">
-                    <thead><tr><th>Tanggal</th><th>Kondisi</th><th>Lokasi</th><th>Keterangan</th></tr></thead>
+                                <table class="admin-table condition-table">
+                    <thead><tr><th>Tanggal</th><th>Kondisi</th><th>Keterangan</th></tr></thead>
                     <tbody>
-                        <tr><td>12 Agustus 2026</td><td><span class="condition-badge green"><i class="bi bi-circle-fill"></i> BAIK</span></td><td>{{ $item['room'] }}</td><td>Pemeriksaan rutin selesai.</td></tr>
-                        <tr><td>5 Agustus 2026</td><td><span class="condition-badge green"><i class="bi bi-circle-fill"></i> BAIK</span></td><td>{{ $item['room'] }}</td><td>Barang siap digunakan.</td></tr>
-                        <tr><td>29 Juli 2026</td><td><span class="condition-badge yellow"><i class="bi bi-circle-fill"></i> RUSAK RINGAN</span></td><td>{{ $item['room'] }}</td><td>Adaptor diperiksa ulang.</td></tr>
+                        @foreach(\['history'] as \)
+                        <tr>
+                            <td>{{ \->checked_at->format('d F Y') }}</td>
+                            <td><span class="condition-badge {{ \->condition === 'rusak' ? 'red' : (\->condition === 'perlu_servis' ? 'yellow' : 'green') }}"><i class="bi bi-circle-fill"></i> {{ strtoupper(str_replace('_', ' ', \->condition)) }}</span></td>
+                            
+                            <td>{{ \->notes }} (Petugas: {{ \->officer }})</td>
+                        </tr>
+                        @endforeach
                     </tbody>
                 </table>
             </div>
@@ -113,6 +115,7 @@
 
     (function () {
         const code = '{{ $selectedCode }}';
+        const databaseCondition = @json($inventoryItem?->condition ?? 'baik');
         function condState(cond) {
             const c = String(cond || '').toUpperCase();
             if (c.includes('RUSAK') && !c.includes('RINGAN')) return { label: 'RUSAK BERAT', status: 'red', ringkasan: 'Tidak Layak Pakai', catatan: 'Barang rusak, perlu perbaikan' };
@@ -138,5 +141,9 @@
 @include('user.partials.profile-sync')
 </body>
 </html>
+
+
+
+
 
 

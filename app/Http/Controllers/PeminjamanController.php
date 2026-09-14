@@ -99,6 +99,18 @@ class PeminjamanController extends Controller
         ]);
     }
 
+    public function myLoans(Request $request): JsonResponse
+    {
+        $borrowings = Borrowing::with(['item', 'returnRecords' => fn ($query) => $query->latest('id')])
+            ->where('user_id', Auth::id())
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json([
+            'borrowings' => $borrowings->map(fn ($b) => $this->formatBorrowing($b)),
+        ]);
+    }
+
     protected function formatBorrowing(Borrowing $borrowing): array
     {
         $item = $borrowing->item;
@@ -110,6 +122,7 @@ class PeminjamanController extends Controller
             'user_id' => $borrowing->user_id,
             'borrower' => $user ? $user->name : '-',
             'identity_number' => $user ? ($user->identity_number ?: '-') : '-',
+            'identity_document' => $user?->identity_document,
             'barang' => $item ? $item->name : '-',
             'item_id' => $item ? $item->id : null,
             'serial' => $item ? $item->code : '-',
@@ -118,8 +131,10 @@ class PeminjamanController extends Controller
             'tanggalPinjam' => optional($borrowing->borrow_date)->format('d/m/Y'),
             'tanggalKembali' => optional($borrowing->due_date)->format('d/m/Y'),
             'status' => $borrowing->status,
+            'return_status' => $borrowing->relationLoaded('returnRecords') ? optional($borrowing->returnRecords->first())->status : null,
             'purpose' => $borrowing->purpose,
-            'image' => $item ? $item->photo : null,
+            'image' => $item && $item->photo ? (\Illuminate\Support\Str::startsWith($item->photo, ['http://', 'https://', 'data:']) ? $item->photo : (\Illuminate\Support\Str::startsWith($item->photo, '/') ? url(ltrim($item->photo, '/')) : asset('images/' . $item->photo))) : null,
         ];
     }
 }
+

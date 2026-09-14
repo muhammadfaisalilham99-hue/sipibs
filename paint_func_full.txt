@@ -1,0 +1,63 @@
+
+>     function paintHistoryBody(combined) {
+          const historyBody = document.getElementById('return-history-body');
+          if (!historyBody) return;
+  
+          if (combined.length === 0) {
+              historyBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#888;">Belum ada riwayat pengembalian.</td></tr>';
+              return;
+          }
+  
+          historyBody.innerHTML = '';
+          combined.forEach(sub => {
+              const cond = sub.condition || 'Baik';
+              let condClass = 'good';
+              let condSymbol = '●';
+              let condLabel = 'Baik';
+  
+              if (cond.includes('Rusak Berat')) {
+                  condClass = 'bad';
+                  condSymbol = '▪';
+                  condLabel = 'Rusak Berat';
+              } else if (cond.includes('Rusak')) {
+                  condClass = 'warn';
+                  condSymbol = '▪';
+                  condLabel = 'Rusak Ringan';
+              }
+  
+              const dateStr = sub.dateDisplay || (sub.submittedAt ? formatReturnDate(sub.submittedAt.split('T')[0]) : '-');
+              const rawStatus = String(sub.status || '').toLowerCase();
+              let statusLabel = rawStatus.includes('bermasalah') || rawStatus.includes('ditolak') ? 'Terdapat Masalah' : (rawStatus.includes('denda') ? 'Denda' : (rawStatus.includes('diterima') ? 'Diterima Admin' : (sub.status === 'Menunggu Verifikasi' ? 'Menunggu Persetujuan' : (sub.status || 'Menunggu Persetujuan'))));
+              let statusClass = String(statusLabel).toLowerCase().includes("masalah") || String(statusLabel).toLowerCase().includes("tolak") ? "rejected" : (String(statusLabel).toLowerCase().includes("denda") ? "fine" : (String(statusLabel).toLowerCase().includes("persetujuan") ? "pending" : "done"));
+              let statusIcon = statusClass === 'rejected' ? 'bi-x-circle' : (statusClass === 'fine' ? 'bi-cash-coin' : (statusClass === 'pending' ? 'bi-clock' : 'bi-check-circle'));
+              let noteContent = sub.note || '-';
+              if (noteContent.startsWith('"') && noteContent.endsWith('"')) {
+                  noteContent = noteContent.slice(1, -1);
+              }
+              let noteDisplay = '"' + noteContent + '"';
+  
+              historyBody.insertAdjacentHTML('beforeend',
+                  '<tr>' +
+                      '<td>' +
+                          '<div class="return-hist-meta">' +
+                              '<strong>' + (sub.itemName || sub.name || '-') + '</strong>' +
+                              '<small style="display:block;color:#64748b;font-size:11.5px;margin-top:2px;">Inv: ' + (sub.serial || sub.id || sub.loanId || '-') + '</small>' +
+                          '</div>' +
+                      '</td>' +
+                      '<td>' + dateStr + '</td>' +
+                      '<td><span class="return-cond-pill ' + condClass + '"><span class="cond-symbol">' + condSymbol + '</span> ' + condLabel + '</span></td>' +
+                      '<td style="color:#475569;font-size:12.5px;max-width:240px;line-height:1.35;">' + noteDisplay + '</td>' +
+                      '<td><span class="return-status-pill ' + statusClass + '"><i class="bi ' + statusIcon + '"></i> ' + statusLabel + '</span></td>' +
+                  '</tr>'
+              );
+          });
+      }
+  
+      function renderReturnHistory() {
+          const historyBody = document.getElementById('return-history-body');
+          if (!historyBody) return;
+  
+          fetch((window.__apiBase || '/api') + '/pengembalian/history', {
+              method: 'GET',
+              headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+

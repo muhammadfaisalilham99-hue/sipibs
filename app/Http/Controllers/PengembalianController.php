@@ -13,9 +13,10 @@ class PengembalianController extends Controller
 {
     public function items(): JsonResponse
     {
-        $borrowings = Borrowing::with(['item'])
+        $borrowings = Borrowing::with(['item', 'returnRecords' => fn ($query) => $query->latest('id')])
             ->where('user_id', Auth::id())
             ->whereIn('status', ['menunggu', 'dipinjam', 'disetujui'])
+            ->whereDoesntHave('returnRecords', fn ($query) => $query->where('status', 'diterima'))
             ->orderByDesc('id')
             ->get();
 
@@ -26,8 +27,11 @@ class PengembalianController extends Controller
 
     public function history(): JsonResponse
     {
-        $returns = ReturnRecord::with(['borrowing.item'])
-            ->whereHas('borrowing', fn ($q) => $q->where('user_id', Auth::id()))
+        $returns = ReturnRecord::with(['borrowing.item', 'fine'])
+            ->where(function ($q) {
+                $q->where('user_id', Auth::id())
+                  ->orWhereHas('borrowing', fn ($b) => $b->where('user_id', Auth::id()));
+            })
             ->orderByDesc('id')
             ->get();
 
@@ -39,12 +43,12 @@ class PengembalianController extends Controller
                 return [
                     'id' => $r->id,
                     'loanId' => $borrowing ? $borrowing->id : null,
-                    'itemName' => $item ? $item->name : '-',
-                    'serial' => $item ? $item->code : '-',
+                    'itemName' => $item ? $item->name : ($r->item_name ?: '-'),
+                    'serial' => $item ? $item->code : ($r->item_code ?: '-'),
                     'dateDisplay' => optional($r->return_date)->format('d M Y'),
                     'condition' => $this->conditionLabel($r->condition),
                     'note' => $r->notes ?: '-',
-                    'status' => $this->returnStatusLabel($r->status),
+                    'status' => $this->returnStatusLabel($r->status, $r->fine),
                 ];
             }),
         ]);
@@ -60,6 +64,12 @@ class PengembalianController extends Controller
             'photos.*' => ['nullable', 'string'],
         ]);
 
+        if (ReturnRecord::where('borrowing_id', $validated['borrowing_id'])->where('status', 'menunggu')->exists()) {
+            return response()->json([
+                'message' => 'Pengembalian sudah diajukan dan menunggu persetujuan admin.',
+            ], 422);
+        }
+
         $borrowing = Borrowing::where('id', $validated['borrowing_id'])
             ->where('user_id', Auth::id())
             ->whereIn('status', ['menunggu', 'dipinjam', 'disetujui'])
@@ -74,6 +84,12 @@ class PengembalianController extends Controller
         $returnRecord = DB::transaction(function () use ($borrowing, $validated) {
             $record = ReturnRecord::create([
                 'borrowing_id' => $borrowing->id,
+                'user_id' => Auth::id(),
+                'borrower_name' => Auth::user()->name,
+                'identity_number' => Auth::user()->identity_number,
+                'item_name' => optional($borrowing->item)->name,
+                'item_code' => optional($borrowing->item)->code,
+                'due_date' => $borrowing->due_date,
                 'return_date' => now()->toDateString(),
                 'returned_quantity' => $borrowing->quantity,
                 'condition' => $validated['condition'] ?? 'baik',
@@ -82,25 +98,11 @@ class PengembalianController extends Controller
                 'photos' => $validated['photos'] ?? [],
             ]);
 
-            $borrowing->status = 'dikembalikan';
-            $borrowing->save();
-
-            if ($borrowing->item) {
-                $item = $borrowing->item;
-                if ($item->borrowed_quantity >= $borrowing->quantity) {
-                    $item->borrowed_quantity = $item->borrowed_quantity - $borrowing->quantity;
-                } else {
-                    $item->borrowed_quantity = 0;
-                }
-                $item->available_quantity = min($item->total_quantity, $item->available_quantity + $borrowing->quantity);
-                $item->save();
-            }
-
             return $record;
         });
 
         return response()->json([
-            'message' => 'Pengembalian berhasil dikonfirmasi dan menunggu verifikasi admin.',
+            'message' => 'Pengembalian berhasil dikonfirmasi dan menunggu persetujuan admin.',
             'return' => [
                 'id' => $returnRecord->id,
                 'code' => 'RTN-' . now()->year . '-' . str_pad((string) $returnRecord->id, 5, '0', STR_PAD_LEFT),
@@ -110,7 +112,7 @@ class PengembalianController extends Controller
                 'dateDisplay' => $returnRecord->return_date->format('d M Y'),
                 'condition' => $this->conditionLabel($returnRecord->condition),
                 'note' => $returnRecord->notes ?: '-',
-                'status' => 'Menunggu Verifikasi',
+                'status' => 'Menunggu Persetujuan',
             ],
         ], 201);
     }
@@ -130,6 +132,19 @@ class PengembalianController extends Controller
         }
 
         $record->status = $validated['action'] === 'accepted' ? 'diterima' : 'bermasalah';
+
+        if ($record->status === 'diterima' && $record->borrowing) {
+            $borrowing = $record->borrowing;
+            $borrowing->status = 'dikembalikan';
+            $borrowing->save();
+
+            if ($borrowing->item) {
+                $item = $borrowing->item;
+                $item->borrowed_quantity = max(0, $item->borrowed_quantity - $borrowing->quantity);
+                $item->available_quantity = min($item->total_quantity, $item->available_quantity + $borrowing->quantity);
+                $item->save();
+            }
+        }
         $record->received_by = Auth::id();
         $record->save();
 
@@ -156,8 +171,8 @@ class PengembalianController extends Controller
                     'borrowing_id' => $r->borrowing_id,
                     'borrower' => $user ? $user->name : '-',
                     'identity_number' => $user ? ($user->identity_number ?: '-') : '-',
-                    'itemName' => $item ? $item->name : '-',
-                    'serial' => $item ? $item->code : '-',
+                    'itemName' => $item ? $item->name : ($r->item_name ?: '-'),
+                    'serial' => $item ? $item->code : ($r->item_code ?: '-'),
                     'quantity' => $r->returned_quantity,
                     'condition' => $this->conditionLabel($r->condition),
                     'notes' => $r->notes ?: '-',
@@ -185,6 +200,10 @@ class PengembalianController extends Controller
             'tanggalPinjam' => optional($borrowing->borrow_date)->format('Y-m-d'),
             'tanggalKembali' => optional($borrowing->due_date)->format('Y-m-d'),
             'status' => $borrowing->status,
+            'return_status' => optional($borrowing->returnRecords->first())->status,
+            'borrower_name' => optional($borrowing->user)->name,
+            'identity_number' => optional($borrowing->user)->identity_number,
+            'quantity' => $borrowing->quantity,
             'image' => $item ? $item->photo : null,
         ];
     }
@@ -198,12 +217,14 @@ class PengembalianController extends Controller
         };
     }
 
-    protected function returnStatusLabel(string $status): string
+    protected function returnStatusLabel(string $status, $fine = null): string
     {
+        if ($fine && $fine->status === 'belum_dibayar') return 'Denda';
         return match ($status) {
-            'diterima' => 'Diterima Admin',
+            'diterima' => 'Dikembalikan',
             'bermasalah' => 'Terdapat Masalah',
-            default => 'Menunggu Verifikasi',
+            default => 'Menunggu Persetujuan',
         };
     }
 }
+

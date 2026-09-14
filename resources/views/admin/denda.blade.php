@@ -31,6 +31,7 @@
             <a class="nav-item {{ $active === 'dashboard' ? 'active' : '' }}" href="{{ url('/dashboard-admin') }}"><i class="bi bi-house-fill"></i> Dashboard</a>
             <div class="menu-caption nav-caption">MASTER DATA</div>
             <a class="nav-item {{ $active === 'master' ? 'active' : '' }}" href="{{ url('/admin/data-master') }}"><i class="bi bi-box-seam-fill"></i> Data Master <span style="margin-left:auto;">›</span></a>
+            <a class="nav-item {{ $active === 'condition' ? 'active' : '' }}" href="{{ url('/admin/kondisi-barang') }}"><i class="bi bi-clipboard2-pulse-fill"></i> Kondisi Barang <span style="margin-left:auto;">›</span></a>
             <a class="nav-item {{ $active === 'user' ? 'active' : '' }}" href="{{ url('/admin/data-user') }}"><i class="bi bi-people-fill"></i> Data User <span style="margin-left:auto;">›</span></a>
             <a class="nav-item {{ $active === 'kategori' ? 'active' : '' }}" href="{{ url('/admin/kategori') }}"><i class="bi bi-diagram-3-fill"></i> Kategori <span style="margin-left:auto;">›</span></a>
             <div class="menu-caption nav-caption">TRANSAKSI</div>
@@ -47,9 +48,16 @@
     </aside>
 
     <main class="denda-main">
-        <header class="denda-top">
-            <div><h1>Denda</h1><div class="breadcrumb"><a href="{{ url('/dashboard-admin') }}">Dashboard</a> / Denda</div></div>
-            <div class="admin-mini"><img class="avatar-target" src="{{ asset('images/PROFIL.png') }}" alt="Admin"><span>Admin</span><i class="bi bi-chevron-down"></i></div>
+        <header class="topbar">
+            <div class="page-label">Denda</div>
+            <div class="top-actions">
+                @include('admin.partials.notification-bell')
+                
+                <div class="top-user">
+                    <div><strong id="top-user-name">Admin</strong><span>Administrator</span></div>
+                    <img class="top-avatar avatar-target" src="{{ asset('images/PROFIL.png') }}" alt="Admin">
+                </div>
+            </div>
         </header>
         <section class="denda-content">
             <div class="denda-stats">
@@ -73,36 +81,105 @@
     </main>
 </div>
 <script>
+    window.__apiBase = @json(rtrim(url('/api'), '/'));
     function rupiah(value){ const n=String(value||'0').replace(/\D/g,'')||'0'; return 'Rp '+Number(n).toLocaleString('id-ID'); }
     function initials(name){ return String(name||'U').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase(); }
+    function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    let allFines = [];
     function fineRows(){
-        const saved = JSON.parse(localStorage.getItem('sipibsFines') || '[]');
-        const active = JSON.parse(localStorage.getItem('sipibsActiveFine') || 'null');
-        let rows = saved.slice();
-        if (active && !rows.some(row => row.id === active.id)) rows.unshift(active);
-        return rows.map((row, idx) => ({
-            code: row.code || ('DN-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(idx + 1).padStart(3,'0')),
-            user: row.borrower || row.user || 'Siswa', nis: row.nis || '-', type: row.fineType || 'Keterlambatan Pengembalian', loan: row.loanId || row.id || '-',
-            date: row.returnDate || row.createdAt || '-', amount: rupiah(row.fineAmount || row.amount), status: row.status === 'Lunas' ? 'Lunas' : 'Belum Lunas', method: row.method || '-', paidAt: row.paidAt || '-'
-        }));
+        return allFines.map(function(row){
+            const paid = String(row.status) === 'lunas';
+            const date = (row.returnDate && row.returnDate !== '-') ? row.returnDate : (row.createdAt || '-');
+            return {
+                code: 'DN-' + (row.id || 0),
+                user: row.borrower || 'Siswa',
+                nis: row.identity_number || '-',
+                type: row.fineType || 'Keterlambatan Pengembalian',
+                loan: row.loanId || row.return_id || '-',
+                date: date,
+                amount: rupiah(row.fineAmount),
+                status: paid ? 'Lunas' : 'Belum Lunas',
+                method: (row.method && row.method !== '-') ? row.method : '-',
+                paidAt: (row.paidAt && row.paidAt !== '-') ? row.paidAt : '-',
+                raw: row
+            };
+        });
     }
     function renderDenda(){
-        const body=document.getElementById('dendaBody'); const q=(document.getElementById('searchFilter').value||'').toLowerCase(); const status=document.getElementById('statusFilter').value; const type=document.getElementById('typeFilter').value;
-        const rows=fineRows().filter(row => (!q || [row.code,row.user,row.nis,row.type,row.loan].join(' ').toLowerCase().includes(q)) && (status==='all' || (status==='paid' ? row.status==='Lunas' : row.status!=='Lunas')) && (type==='all' || row.type===type));
-        body.innerHTML = rows.map((row,i)=>`<tr><td>${i+1}</td><td>${row.code}</td><td><div class="user-cell"><div class="avatar-sm">${initials(row.user)}</div><div><strong>${row.user}</strong><small>${row.nis}</small></div></div></td><td>${row.type}</td><td><a class="loan-link" href="#">${row.loan}</a></td><td>${row.date}</td><td>${row.amount}</td><td><span class="${row.status==='Lunas'?'badge-paid':'badge-unpaid'}">${row.status}</span></td><td>${row.method}</td><td>${row.paidAt}</td><td><button class="eye-btn" type="button"><i class="bi bi-eye"></i></button></td></tr>`).join('') || '<tr><td colspan="11" style="text-align:center;padding:35px;color:#64748b;">Belum ada data denda.</td></tr>';
+        const body=document.getElementById('dendaBody');
+        const q=(document.getElementById('searchFilter').value||'').toLowerCase();
+        const status=document.getElementById('statusFilter').value;
+        const type=document.getElementById('typeFilter').value;
+        const rows=fineRows().filter(row =>
+            (!q || [row.code,row.user,row.nis,row.type,row.loan].join(' ').toLowerCase().includes(q)) &&
+            (status==='all' || (status==='paid' ? row.status==='Lunas' : row.status!=='Lunas')) &&
+            (type==='all' || row.type===type));
+        body.innerHTML = rows.length ? rows.map((row,i)=>`<tr><td>${i+1}</td><td>${row.code}</td><td><div class="user-cell"><div class="avatar-sm">${initials(row.user)}</div><div><strong>${escapeHtml(row.user)}</strong><small>${escapeHtml(row.nis)}</small></div></div></td><td>${escapeHtml(row.type)}</td><td><a class="loan-link" href="#">${escapeHtml(row.loan)}</a></td><td>${row.date}</td><td>${row.amount}</td><td><span class="${row.status==='Lunas'?'badge-paid':'badge-unpaid'}">${row.status}</span></td><td>${escapeHtml(row.method)}</td><td>${row.paidAt}</td><td><button class="eye-btn" type="button" data-id="${row.raw.id}" title="Lihat detail"><i class="bi bi-eye"></i></button></td></tr>`).join('') : '<tr><td colspan="11" style="text-align:center;padding:35px;color:#64748b;">Belum ada data denda.</td></tr>';
         document.getElementById('dendaInfo').textContent = rows.length ? `Menampilkan 1 - ${rows.length} dari ${rows.length} data` : 'Menampilkan 0 data';
-        const paid=rows.filter(r=>r.status==='Lunas').length; const total=rows.length; const income=rows.filter(r=>r.status==='Lunas').reduce((s,r)=>s+(parseInt(String(r.amount).replace(/\D/g,''))||0),0);
-        document.getElementById('statTotal').textContent=total; document.getElementById('statPaid').textContent=paid; document.getElementById('statUnpaid').textContent=total-paid; document.getElementById('statIncome').textContent=rupiah(income);
+        const paid=rows.filter(r=>r.status==='Lunas').length;
+        const total=rows.length;
+        const income=rows.filter(r=>r.status==='Lunas').reduce((s,r)=>s+(parseInt(String(r.amount).replace(/\D/g,''))||0),0);
+        document.getElementById('statTotal').textContent=total;
+        document.getElementById('statPaid').textContent=paid;
+        document.getElementById('statUnpaid').textContent=total-paid;
+        document.getElementById('statIncome').textContent=rupiah(income);
     }
-    localStorage.removeItem('sipibsFines');
-    localStorage.removeItem('sipibsActiveFine');
+    function loadFines(){
+        fetch((window.__apiBase || '/api') + '/denda/admin', {
+            method: 'GET',
+            headers: { 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest' }
+        })
+        .then(function(res){ if (!res.ok) throw new Error('fail'); return res.json(); })
+        .then(function(data){
+            allFines = (data && Array.isArray(data.fines)) ? data.fines : [];
+            renderDenda();
+        })
+        .catch(function(){ renderDenda(); });
+    }
+    function showDetail(id){
+        const row = allFines.find(f => f.id === id);
+        if (!row) return;
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(7,23,53,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;';
+        overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:540px;width:100%;padding:28px;font-family:Inter,sans-serif;color:#071735;box-shadow:0 24px 60px rgba(0,0,0,.25);position:relative;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+                <h3 style="margin:0;font-size:20px;font-weight:900;">Detail Denda</h3>
+                <button type="button" style="border:none;background:#eef2f9;width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:17px;" class="denda-modal-close">&times;</button>
+            </div>
+            <div style="font-size:14px;line-height:1.9;">
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Kode Denda</span><strong>DN-${row.id}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Peminjam</span><strong>${escapeHtml(row.borrower)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">NIS / NIP</span><strong>${escapeHtml(row.identity_number)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Barang</span><strong>${escapeHtml(row.itemName)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">ID Peminjaman</span><strong>${escapeHtml(row.loanId)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Jenis Denda</span><strong>${escapeHtml(row.fineType)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Tanggal Ganti</span><strong>${row.returnDate}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Jatuh Tempo</span><strong>${row.dueDate}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Nominal</span><strong>${rupiah(row.fineAmount)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Status</span><strong><span class="${row.status==='lunas'?'badge-paid':'badge-unpaid'}">${row.status==='lunas'?'Lunas':'Belum Lunas'}</span></strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Metode Bayar</span><strong>${escapeHtml(row.method)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Tanggal Bayar</span><strong>${row.paidAt}</strong></div>
+                <div style="margin-top:12px;padding:12px;background:#f5f8fd;border-radius:10px;color:#475569;">${escapeHtml(row.notes)}</div>
+            </div>
+        </div>`;
+        const closeBtn = overlay.querySelector('.denda-modal-close');
+        closeBtn.addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+    document.getElementById('dendaBody').addEventListener('click', function(e){
+        const btn = e.target.closest('.eye-btn');
+        if (btn) { const id = parseInt(btn.dataset.id); if (!isNaN(id)) showDetail(id); }
+    });
     document.getElementById('searchFilter').addEventListener('input', renderDenda);
     document.getElementById('statusFilter').addEventListener('change', renderDenda);
     document.getElementById('typeFilter').addEventListener('change', renderDenda);
-    renderDenda();
+    loadFines();
+    setInterval(loadFines, 8000);
 </script>
 @include('admin.partials.sidebar-scroll')
 @include('admin.partials.profile-sync')
 <script src="{{ asset('js/admin-notification.js') }}?v=2"></script>
 </body>
 </html>
+

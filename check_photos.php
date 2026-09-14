@@ -1,0 +1,1 @@
+<?php require 'bootstrap/app.php'; \->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); use App\Models\InventoryItem; foreach(InventoryItem::all() as \) { echo \->name . ' | ' . \->photo . PHP_EOL; }

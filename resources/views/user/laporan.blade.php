@@ -11,8 +11,10 @@
     <link rel="stylesheet" href="{{ asset('css/sipibs-ui.css') }}?v=19">
 </head>
 <body>
+@include('user.partials.local-storage-cleanup')
 @php
     $userName = Auth::check() ? Auth::user()->name : 'Rizky Pratama';
+    $itemPhotos = \App\Models\InventoryItem::pluck('photo', 'name')->toArray();
 @endphp
 <div class="app-shell">
     <aside class="sidebar user-sidebar">
@@ -44,7 +46,7 @@
             <div class="top-actions">
                 @include('user.partials.notification-bell')
                 <div class="top-user">
-                    <div><strong id="top-user-name">{{ $userName }}</strong><span>SISWA</span></div>
+                    <div><strong id="top-user-name">{{ $userName }}</strong><span>{{ Auth::check() && Auth::user()->role === 'guru' ? 'GURU' : 'SISWA' }}</span></div>
                     <img class="top-avatar" id="top-avatar" src="{{ asset('images/PROFIL.png') }}" alt="Avatar">
                 </div>
             </div>
@@ -116,6 +118,17 @@
 </div>
 
 <script>
+        const ITEM_PHOTOS = @json($itemPhotos);
+    function renderItemMedia(name, icon) {
+        const photo = (ITEM_PHOTOS && ITEM_PHOTOS[name]) ? ITEM_PHOTOS[name] : '';
+        if (photo) {
+            const src = (photo.startsWith('http') || photo.startsWith('/') || photo.startsWith('storage/'))
+                ? photo
+                : '{{ asset("images") }}/' + photo;
+            return '<img src="' + src + '" alt="' + (name || 'Barang') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'<i class=&quot;bi ' + icon + '&quot;></i>\';">';
+        }
+        return '<i class="bi ' + icon + '"></i>';
+    }
     document.addEventListener('DOMContentLoaded', function () {
         let showAll = false;
         let activeStatus = 'Semua';
@@ -126,13 +139,49 @@
         const filterBtn = document.getElementById('historyFilterBtn');
         const seeAllBtn = document.getElementById('seeAllHistoryBtn');
 
+        function getLoanSignature(loan) {
+            function normDate(v) {
+                var s = String(v || '').trim();
+                if (!s) return '';
+                var m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+                if (m) return m[3] + m[2] + m[1];
+                return s.replace(/[^0-9]/g, '');
+            }
+            return [String(loan.nis || loan.identity_number || '').replace(/\D/g, ''), String(loan.barang || loan.item || '').toLowerCase(), normDate(loan.tanggalPinjam), normDate(loan.tanggalKembali)].join('|');
+        }
+
+        function isSameLoan(a, b) {
+            if (!a || !b) return false;
+            if (a.borrowingId != null && b.borrowingId != null && Number(a.borrowingId) === Number(b.borrowingId)) return true;
+            if (a.id && b.id && String(a.id) === String(b.id)) return true;
+            return getLoanSignature(a) === getLoanSignature(b);
+        }
+
+        function dedupeLoanRows(list) {
+            var meaningful = function (x) { return /^(dipinjam|approved|dikembalikan|returned|ditolak|rejected)$/.test(String(x.status || '').toLowerCase()); };
+            var out = [];
+            (Array.isArray(list) ? list : []).forEach(function (loan) {
+                if (!loan) return;
+                var idx = -1;
+                for (var k = 0; k < out.length; k++) {
+                    if (isSameLoan(out[k], loan)) { idx = k; break; }
+                }
+                if (idx === -1) { out.push(loan); return; }
+                var existing = out[idx];
+                var es = (existing.borrowingId != null ? 2 : 0) + (meaningful(existing) ? 1 : 0);
+                var ns = (loan.borrowingId != null ? 2 : 0) + (meaningful(loan) ? 1 : 0);
+                if (ns > es) out[idx] = loan;
+            });
+            return out;
+        }
+
         function getHistoryData() {
             var history = JSON.parse(localStorage.getItem('sipibsLoanHistory') || '[]');
             var decision = JSON.parse(localStorage.getItem('sipibsLoanDecision') || 'null');
             var request = JSON.parse(localStorage.getItem('sipibsLoanRequest') || 'null');
             var fallback = decision && decision.request ? decision.request : request;
-            var list = history.length ? history : (fallback ? [fallback] : []);
-            if (fallback && fallback.id && !list.some(function (x) { return x.id === fallback.id; })) list.unshift(fallback);
+            var list = history.length ? dedupeLoanRows(history) : (fallback ? [fallback] : []);
+            if (fallback && fallback.id && !list.some(function (x) { return isSameLoan(x, fallback); })) list.unshift(fallback);
             var statusMap = {
                 approved: ['Dipinjam', 'blue'],
                 rejected: ['Ditolak', 'red'],
@@ -140,7 +189,7 @@
                 returned: ['Dikembalikan', 'green'],
                 'dikembalikan': ['Dikembalikan', 'green']
             };
-            return list.map(function (loan) {
+            var rows = list.map(function (loan) {
                 var raw = String(loan.status || 'approved').toLowerCase();
                 var s = statusMap[raw] || (raw === 'dipinjam' ? statusMap.approved : statusMap.pending);
                 var late = isLoanLate(loan.tanggalKembali) && (raw !== 'pending' && raw !== 'menunggu' && raw !== 'returned' && raw !== 'dikembalikan' && raw !== 'rejected' && raw !== 'ditolak');
@@ -152,10 +201,20 @@
                     icon: getItemIcon(loan.barang),
                     pinjam: formatRptDate(loan.tanggalPinjam),
                     kembali: formatRptDate(loan.tanggalKembali),
+                    sortDate: loan.tanggalKembali,
                     status: late ? 'Terlambat' : s[0],
                     type: late ? 'red' : s[1]
                 };
             });
+            rows.sort(function (a, b) {
+                var aReturned = a.status === 'Dikembalikan';
+                var bReturned = b.status === 'Dikembalikan';
+                if (aReturned !== bReturned) return aReturned ? -1 : 1;
+                var aDate = parseLoanDate(a.sortDate);
+                var bDate = parseLoanDate(b.sortDate);
+                return (bDate ? bDate.getTime() : 0) - (aDate ? aDate.getTime() : 0);
+            });
+            return rows;
         }
 
         function getLoanItems() {
@@ -163,8 +222,8 @@
             var decision = JSON.parse(localStorage.getItem('sipibsLoanDecision') || 'null');
             var request = JSON.parse(localStorage.getItem('sipibsLoanRequest') || 'null');
             var fallback = decision && decision.request ? decision.request : request;
-            var list = Array.isArray(history) ? history.slice() : [];
-            if (fallback && fallback.id && !list.some(function (x) { return x.id === fallback.id; })) list.unshift(fallback);
+            var list = Array.isArray(history) ? dedupeLoanRows(history.slice()) : [];
+            if (fallback && fallback.id && !list.some(function (x) { return isSameLoan(x, fallback); })) list.unshift(fallback);
             return list;
         }
 
@@ -275,7 +334,7 @@
                 return '<tr>' +
                     '<td>' + (idx + 1) + '</td>' +
                     '<td><strong>' + item.borrower + '</strong><small>NIM. ' + item.nim + '</small></td>' +
-                    '<td><div class="history-item-cell"><span><i class="bi ' + item.icon + '"></i></span><div><strong>' + item.item + '</strong><small>' + item.desc + '</small></div></div></td>' +
+                    '<td><div class="history-item-cell"><span>' + renderItemMedia(item.item, item.icon) + '</span><div><strong>' + item.item + '</strong><small>' + item.desc + '</small></div></div></td>' +
                     '<td>' + item.pinjam + '</td>' +
                     '<td>' + item.kembali + '</td>' +
                     '<td><span class="history-status ' + item.type + '"><i class="bi bi-circle-fill"></i> ' + item.status + '</span></td>' +
@@ -351,5 +410,10 @@
 </script>
 <script src="{{ asset('js/user-notification.js') }}?v=5"></script>
 @include('user.partials.profile-sync')
+@include('user.partials.loan-server-sync')
 </body>
 </html>
+
+
+
+

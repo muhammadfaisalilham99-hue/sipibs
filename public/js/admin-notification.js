@@ -1,51 +1,78 @@
-document.addEventListener('DOMContentLoaded', function () {
-    function refreshCount(notif) {
-        const count = notif.querySelector('.admin-notification-count');
-        if (!count) return;
-        const totalUnread = notif.querySelectorAll('.notification-item.unread').length;
-        count.textContent = String(totalUnread);
-        count.style.display = totalUnread > 0 ? 'inline-flex' : 'none';
+(function () {
+    function getStored(key) {
+        try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; }
+    }
+    function setStored(key, val) {
+        try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
     }
 
-    function renderSipibsLoanAdminNotification() {
+    function refreshCount(notif) {
+        const count = notif.querySelector('.admin-notification-count');
+        const totalUnread = notif.querySelectorAll('.notification-item.unread').length;
+        count.textContent = String(totalUnread);
+        count.style.display = totalUnread ? 'inline-flex' : 'none';
+    }
+
+    function renderNotifications() {
         document.querySelectorAll('[data-admin-notification]').forEach(function (notif) {
             const list = notif.querySelector('.notification-list');
             if (!list) return;
-            const request = JSON.parse(localStorage.getItem('sipibsLoanRequest') || 'null');
-            const decision = JSON.parse(localStorage.getItem('sipibsLoanDecision') || 'null');
-            const oldDynamic = list.querySelector('[data-loan-admin-notification]');
-            if (oldDynamic) oldDynamic.remove();
+            Promise.all([
+                fetch('/api/peminjaman/list?status=all', { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } }).then(r => r.ok ? r.json() : { borrowings: [] }),
+                fetch('/api/pengembalian/admin/pending', { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } }).then(r => r.ok ? r.json() : { returns: [] })
+            ]).then(([loanData, returnData]) => {
+                const deletedIds = getStored('sipibsAdminDeletedNotifs');
+                const readIds = getStored('sipibsAdminReadNotifs');
+                const loans = (Array.isArray(loanData.borrowings) ? loanData.borrowings : []).slice(0, 20);
+                const returns = (Array.isArray(returnData.returns) ? returnData.returns : []).slice(0, 20);
 
-            if (request && (!decision || decision.status === 'pending')) {
-                const item = document.createElement('div');
-                item.className = 'notification-item unread';
-                item.setAttribute('data-loan-admin-notification', '1');
-                item.innerHTML = `
-                    <span class="notif-icon blue"><i class="bi bi-journal-check"></i></span>
-                    <div>
-                        <strong>1 peminjaman menunggu</strong>
-                        <small>${request.nama} mengajukan ${request.barang}.</small>
-                        <div style="display:flex;gap:6px;margin-top:8px;">
-                            <button type="button" class="btn-simulasi green" style="padding:6px 10px;font-size:11px;" data-loan-decision="approved">Setujui</button>
-                            <button type="button" class="btn-simulasi red" style="padding:6px 10px;font-size:11px;" data-loan-decision="rejected">Tolak</button>
-                        </div>
+                const allItems = [
+                    ...loans.map(loan => ({
+                        id: 'loan-' + loan.id,
+                        title: 'Peminjaman barang',
+                        text: `${loan.borrower || '-'} meminjam ${loan.barang || '-'}.`,
+                        icon: 'bi-box-arrow-in-down',
+                        color: 'blue'
+                    })),
+                    ...returns.map(item => ({
+                        id: 'return-' + item.id,
+                        title: 'Pengembalian barang',
+                        text: `${item.borrower || '-'} mengembalikan ${item.itemName || '-'}.`,
+                        icon: 'bi-box-arrow-in-up',
+                        color: 'green'
+                    }))
+                ].filter(it => !deletedIds.includes(it.id));
+
+                if (!allItems.length) {
+                    list.innerHTML = '<div class="notification-item"><div><strong>Tidak ada notifikasi baru</strong><small>Belum ada aktivitas peminjaman atau pengembalian.</small></div></div>';
+                    refreshCount(notif);
+                    return;
+                }
+
+                list.innerHTML = allItems.map(it => {
+                    const isUnread = !readIds.includes(it.id);
+                    return `<div class="notification-item ${isUnread ? 'unread' : ''}" data-notif-id="${it.id}">
+                        <span class="notif-icon ${it.color}"><i class="bi ${it.icon}"></i></span>
+                        <div><strong>${it.title}</strong><small>${it.text}</small></div>
                     </div>`;
-                list.prepend(item);
-            }
-            refreshCount(notif);
+                }).join('');
+
+                refreshCount(notif);
+            }).catch(() => {
+                list.innerHTML = '<div class="notification-item"><div><strong>Notifikasi gagal dimuat</strong><small>Periksa koneksi lalu coba lagi.</small></div></div>';
+                refreshCount(notif);
+            });
         });
     }
 
     document.querySelectorAll('[data-admin-notification]').forEach(function (notif) {
         const button = notif.querySelector('.admin-notification-btn');
         const markRead = notif.querySelector('.mark-read-btn');
+        const deleteRead = notif.querySelector('.delete-read-btn');
 
         button.addEventListener('click', function (event) {
             event.stopPropagation();
-            document.querySelectorAll('[data-admin-notification].open').forEach(function (openNotif) {
-                if (openNotif !== notif) openNotif.classList.remove('open');
-            });
-            renderSipibsLoanAdminNotification();
+            renderNotifications();
             notif.classList.toggle('open');
             button.setAttribute('aria-expanded', notif.classList.contains('open') ? 'true' : 'false');
         });
@@ -53,63 +80,38 @@ document.addEventListener('DOMContentLoaded', function () {
         markRead.addEventListener('click', function (event) {
             event.preventDefault();
             event.stopPropagation();
-            notif.querySelectorAll('.notification-item').forEach(function (item) {
+            const readIds = getStored('sipibsAdminReadNotifs');
+            notif.querySelectorAll('.notification-item[data-notif-id]').forEach(item => {
+                const id = item.dataset.notifId;
+                if (id && !readIds.includes(id)) readIds.push(id);
                 item.classList.remove('unread');
             });
+            setStored('sipibsAdminReadNotifs', readIds);
+            refreshCount(notif);
+        });
+
+        deleteRead.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const deletedIds = getStored('sipibsAdminDeletedNotifs');
+            notif.querySelectorAll('.notification-item:not(.unread)[data-notif-id]').forEach(item => {
+                const id = item.dataset.notifId;
+                if (id && !deletedIds.includes(id)) deletedIds.push(id);
+                item.remove();
+            });
+            setStored('sipibsAdminDeletedNotifs', deletedIds);
+            if (!notif.querySelectorAll('.notification-item').length) {
+                const list = notif.querySelector('.notification-list');
+                if (list) list.innerHTML = '<div class="notification-item"><div><strong>Tidak ada notifikasi baru</strong><small>Belum ada aktivitas peminjaman atau pengembalian.</small></div></div>';
+            }
             refreshCount(notif);
         });
     });
 
     document.addEventListener('click', function (event) {
-        const decisionButton = event.target.closest('[data-loan-decision]');
-        if (decisionButton) {
-            event.preventDefault();
-            event.stopPropagation();
-            const request = JSON.parse(localStorage.getItem('sipibsLoanRequest') || 'null');
-            if (!request) return;
-            const status = decisionButton.getAttribute('data-loan-decision');
-            request.status = status;
-            request.decidedAt = new Date().toISOString();
-            const history = JSON.parse(localStorage.getItem('sipibsLoanHistory') || '[]');
-            const updatedHistory = history.map(item => item.id === request.id ? request : item);
-            if (!updatedHistory.some(item => item.id === request.id)) updatedHistory.unshift(request);
-            localStorage.setItem('sipibsLoanHistory', JSON.stringify(updatedHistory));
-            localStorage.setItem('sipibsLoanDecision', JSON.stringify({
-                status: status,
-                request: request,
-                decidedAt: request.decidedAt
-            }));
-            const notifications = JSON.parse(localStorage.getItem('sipibsUserNotifications') || '[]');
-            const notifId = 'loan-decision-' + request.id + '-' + status;
-            const approved = status === 'approved';
-            if (!notifications.some(item => item.id === notifId)) {
-                notifications.unshift({
-                    id: notifId,
-                    title: approved ? 'Peminjaman Disetujui' : 'Peminjaman Ditolak',
-                    message: (request.barang || 'Barang') + (approved ? ' disetujui admin. Klik untuk melihat bukti peminjaman.' : ' ditolak admin. Klik untuk melihat detail.'),
-                    icon: approved ? 'bi-check-circle' : 'bi-x-circle',
-                    type: approved ? 'green' : 'red',
-                    read: false,
-                    loanStatus: status,
-                    loanId: request.id,
-                    url: approved ? (request.downloadUrl || request.detailUrl || '/peminjaman-user') : (request.detailUrl || '/peminjaman-user'),
-                    time: request.decidedAt
-                });
-                localStorage.setItem('sipibsUserNotifications', JSON.stringify(notifications.slice(0, 20)));
-            }
-            alert(status === 'approved' ? 'Peminjaman disetujui. Notifikasi dikirim ke user.' : 'Peminjaman ditolak. Notifikasi dikirim ke user.');
-            renderSipibsLoanAdminNotification();
-            return;
-        }
-
-        document.querySelectorAll('[data-admin-notification].open').forEach(function (notif) {
-            notif.classList.remove('open');
-            const button = notif.querySelector('.admin-notification-btn');
-            if (button) button.setAttribute('aria-expanded', 'false');
-        });
+        if (!event.target.closest('[data-admin-notification]')) document.querySelectorAll('[data-admin-notification].open').forEach(item => item.classList.remove('open'));
     });
 
-    window.addEventListener('storage', renderSipibsLoanAdminNotification);
-    renderSipibsLoanAdminNotification();
-});
-
+    renderNotifications();
+    setInterval(renderNotifications, 30000);
+})();

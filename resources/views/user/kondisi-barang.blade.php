@@ -11,27 +11,22 @@
     <link rel="stylesheet" href="{{ asset('css/sipibs-ui.css') }}?v=25">
 </head>
 <body>
+@include('user.partials.local-storage-cleanup')
 @php
     $userName = Auth::check() ? Auth::user()->name : 'Dina Atalia';
     $userRole = 'SISWA';
     $page = max(1, min(2, (int) request('slide', 1)));
-    $defaultRows = [
-        ['name' => 'Mouse HP USB-2', 'room' => 'Lab Komputer', 'code' => 'PRJ-001', 'cat' => 'Elektronik', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-mouse'],
-        ['name' => 'Keyboard NuPhy Air75', 'room' => 'Lab Komputer', 'code' => 'CAM-002', 'cat' => 'Elektronik', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-keyboard'],
-        ['name' => 'Laptop Lenovo Ideapad Slim 3', 'room' => 'Lab Komputer', 'code' => 'LAP-003', 'cat' => 'Elektronik', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-laptop'],
-        ['name' => 'Headset Logitech G 432 7.1', 'room' => 'Lab Multimedia', 'code' => 'SPK-004', 'cat' => 'Audio Visual', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-headphones'],
-        ['name' => '4K Webcam 1080P 60fps Mini Video Camera', 'room' => 'Lab Multimedia', 'code' => 'TRI-005', 'cat' => 'Elektronik', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-camera-video'],
-        ['name' => 'Epson EX3240 SVGA 3LCD Projector 3200', 'room' => 'Ruang Kelas', 'code' => 'MIK-006', 'cat' => 'Praktikum', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-easel'],
-        ['name' => 'Kabel Black High Speed 1.4 Version Gold-Plated HDMI', 'room' => 'Gudang Inventaris', 'code' => 'GLO-007', 'cat' => 'Peralatan Kantor', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-usb-plug'],
-        ['name' => 'Kabel 0.3m 1.5M 3m VGA To VGA Cable 15 Pin', 'room' => 'Gudang Inventaris', 'code' => 'BOL-008', 'cat' => 'Peralatan Kantor', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-plug'],
-        ['name' => 'Kabel LAN CAT6 UTP Cable Networking', 'room' => 'Lab Jaringan', 'code' => 'RKT-009', 'cat' => 'Peralatan Kantor', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-ethernet'],
-        ['name' => 'Kabel HDMI to VGA Adapter Gold Plated', 'room' => 'Gudang Inventaris', 'code' => 'PPT-010', 'cat' => 'Peralatan Kantor', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-usb-c'],
-        ['name' => 'Pen Wireless Remote Controller Laser Pointer', 'room' => 'Ruang Presentasi', 'code' => 'MS-011', 'cat' => 'Elektronik', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-broadcast-pin'],
-        ['name' => 'Stop Kontak', 'room' => 'Gudang Inventaris', 'code' => 'PRJ-012', 'cat' => 'Elektronik', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-outlet'],
-        ['name' => '2pcs Multifunctional network tester 468 network cable', 'room' => 'Lab Jaringan', 'code' => 'HDM-013', 'cat' => 'Peralatan Kantor', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-router'],
-        ['name' => 'Tang Crimping Tool RJ45 RJ11 HT-200R', 'room' => 'Lab Jaringan', 'code' => 'LAN-014', 'cat' => 'Peralatan Kantor', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-tools'],
-        ['name' => 'JBL Boombox 3 Portable Rechargeable Splashproof Bluetooth', 'room' => 'Aula Sekolah', 'code' => 'ADP-015', 'cat' => 'Elektronik', 'condition' => 'BAIK', 'status' => 'green', 'icon' => 'bi-speaker'],
-    ];
+    $categoryNames = \Illuminate\Support\Facades\DB::table('item_categories')->pluck('name', 'id');
+    $defaultRows = \App\Models\InventoryItem::with(['conditionHistories' => fn ($query) => $query->latest('checked_at')])->orderBy('id')->get()->map(fn ($item) => [
+        'name' => $item->name,
+        'code' => $item->code,
+        'cat' => $categoryNames[$item->item_category_id] ?? 'Lainnya',
+        'condition' => match ($item->condition) { 'rusak' => 'RUSAK BERAT', 'perlu_servis' => 'RUSAK RINGAN', default => 'BAIK' },
+        'status' => match ($item->condition) { 'rusak' => 'red', 'perlu_servis' => 'yellow', default => 'green' },
+        'icon' => 'bi-box-seam',
+        'photo' => $item->photo,
+        'last_checked' => $item->conditionHistories->first()?->checked_at?->format('d/m/Y') ?? '-',
+    ])->values()->all();
 @endphp
 <div class="app-shell">
     <aside class="sidebar user-sidebar">
@@ -63,7 +58,7 @@
                 @include('user.partials.notification-bell')
 
                 <div class="top-user">
-                    <div><strong id="top-user-name">{{ $userName }}</strong><span>SISWA</span></div>
+                    <div><strong id="top-user-name">{{ $userName }}</strong><span>{{ Auth::check() && Auth::user()->role === 'guru' ? 'GURU' : 'SISWA' }}</span></div>
                     <img class="top-avatar" id="top-avatar" src="{{ asset('images/PROFIL.png') }}" alt="Avatar">
                 </div>
             </div>
@@ -111,12 +106,12 @@
             </div>
             <div class="condition-table-card">
                 <table class="admin-table condition-table">
-                    <thead><tr><th>Nama Barang</th><th>Kode Barang</th><th>Kategori</th><th>Kondisi</th><th>Aksi</th></tr></thead>
+                    <thead><tr><th>Nama Barang</th><th>Kode Barang</th><th>Kategori</th><th>Kondisi</th><th>TERAKHIR DIPERIKSA</th></tr></thead>
                     <tbody id="conditionTableBody">
                     </tbody>
                 </table>
                 <div class="pager-row condition-pager-row">
-                    <span id="conditionPagerInfo">Menampilkan 1-10 dari 15 barang</span>
+                    <span id="conditionPagerInfo">Menampilkan 1-10 dari {{ count($defaultRows) }} barang</span>
                     <div class="pager condition-pager" id="conditionPager"></div>
                 </div>
             </div>
@@ -153,14 +148,15 @@
         return { label: 'BAIK', status: 'green' };
     }
 
+    function photoUrl(photo) {
+        if (!photo) return '';
+        return photo.startsWith('http') || photo.startsWith('/') || photo.startsWith('storage/')
+            ? photo
+            : '{{ asset('images') }}/' + photo;
+    }
+
     function loadConditionRows() {
-        let master = [];
-        try { master = JSON.parse(localStorage.getItem('sipibsMasterItems') || '[]'); } catch (e) {}
-        return CONDITION_DEFAULTS.map(function (def) {
-            const item = master.find(function (m) { return String(m.code).toUpperCase() === String(def.code).toUpperCase(); });
-            const cond = conditionToState(item ? item.condition : 'BAIK');
-            return Object.assign({}, def, { condition: cond.label, status: cond.status });
-        });
+        return CONDITION_DEFAULTS;
     }
 
     const conditionTableBody = document.getElementById('conditionTableBody');
@@ -204,11 +200,11 @@
 
         conditionTableBody.innerHTML = pageRows.map(function (r) {
             return `<tr>
-                <td><div class="condition-name"><span class="condition-item-icon"><i class="bi ${r.icon}"></i></span><div><strong>${r.name}</strong><small>${r.room}</small></div></div></td>
+                <td><div class="condition-name"><span class="condition-item-icon">${r.photo ? `<img src="${photoUrl(r.photo)}" alt="${r.name}">` : `<i class="bi ${r.icon}"></i>`}</span><div><strong>${r.name}</strong></div></div></td>
                 <td><span class="condition-code">${r.code}</span></td>
                 <td>${r.cat}</td>
                 <td><span class="condition-badge ${r.status}"><i class="bi bi-circle-fill"></i> ${r.condition}</span></td>
-                <td><a class="condition-action" href="{{ url('/detail-kondisi-barang') }}/${r.code}">${r.status === 'red' ? 'Cek Riwayat' : 'Lihat Detail'}</a></td>
+                <td><span class="condition-date">${r.last_checked}</span></td>
             </tr>`;
         }).join('');
 
@@ -285,6 +281,9 @@
 @include('user.partials.profile-sync')
 </body>
 </html>
+
+
+
 
 
 

@@ -20,6 +20,7 @@
                 var nis = data.nis || '';
                 var birthdate = data.birthdate || data.tanggalLahir || '';
                 var gender = data.gender || data.jenisKelamin || '';
+                var role = data.role || '';
 
                 if (name) {
                     var nameEls = document.querySelectorAll('[data-profile-name]');
@@ -27,7 +28,7 @@
                     var topUserName = document.getElementById('top-user-name');
                     if (topUserName) topUserName.textContent = name;
                     if (topUserName && topUserName.nextElementSibling && isUserPage) {
-                        topUserName.nextElementSibling.textContent = 'SISWA';
+                        topUserName.nextElementSibling.textContent = role === 'guru' ? 'GURU' : 'SISWA';
                     }
                     var topAdminName = document.getElementById('topAdminName');
                     if (topAdminName) topAdminName.textContent = name;
@@ -121,4 +122,6 @@ if (nis) {
         window.applySipibsProfile = applySipibsProfile;
     })();
 </script>
+
+
 

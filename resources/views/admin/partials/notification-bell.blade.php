@@ -11,6 +11,6 @@
         <div class="notification-list">
             <!-- Notifikasi dinamis diisi oleh admin-notification.js -->
         </div>
-        <a href="{{ url('/admin/laporan') }}" class="notification-footer">Lihat laporan lengkap</a>
+        <button type="button" class="notification-footer delete-read-btn" style="border:0;outline:none;width:100%;text-align:center;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;color:#003985;background:#eef9ff;padding:12px 16px;border-radius:0 0 16px 16px;display:block;">Hapus yang sudah dibaca</button>
     </div>
 </div>
