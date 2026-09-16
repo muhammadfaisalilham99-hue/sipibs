@@ -21,8 +21,14 @@
         'cat' => ($inventoryItem && isset($categoryNames[$inventoryItem->item_category_id])) ? $categoryNames[$inventoryItem->item_category_id] : 'Lainnya',
         'photo' => $inventoryItem ? $inventoryItem->photo : null,
         'history' => $inventoryItem ? $inventoryItem->conditionHistories : collect(),
-    ];
+];
     $selectedCode = $code;
+    $latestHistory = $inventoryItem?->conditionHistories?->first();
+    $badgeState = match ($inventoryItem?->condition) {
+        'rusak' => ['RUSAK BERAT', 'red', 'Tidak Layak Pakai', 'Barang rusak, perlu perbaikan'],
+        'perlu_servis' => ['RUSAK RINGAN', 'yellow', 'Kurang Layak', 'Barang mengalami kerusakan ringan'],
+        default => ['BAIK', 'green', 'Layak Pakai', 'Tidak ada kerusakan'],
+    };
 @endphp
 <div class="app-shell">
     <aside class="sidebar user-sidebar">
@@ -77,14 +83,14 @@
                     <h2>{{ $item['name'] }}</h2>
                     <span class="condition-code">{{ $selectedCode }}</span>
                     <p>{{ $item['cat'] }}</p>
-<span class="condition-badge green" id="detailConditionBadge"><i class="bi bi-circle-fill"></i> BAIK</span>
+<span class="condition-badge {{ $badgeState[1] }}" id="detailConditionBadge"><i class="bi bi-circle-fill"></i> {{ $badgeState[0] }}</span>
                 </div>
                 <div class="detail-condition-card">
                     <h3>Ringkasan Kondisi</h3>
-                    <div class="detail-row"><span>Status</span><strong id="detailConditionRingkasan">Layak Pakai</strong></div>
-                    <div class="detail-row"><span>Pemeriksaan Terakhir</span><strong>12 Agustus 2026</strong></div>
-                    <div class="detail-row"><span>Petugas</span><strong>Sarpras SIPIBS</strong></div>
-                    <div class="detail-row"><span>Catatan</span><strong id="detailConditionCatatan">Tidak ada kerusakan</strong></div>
+                    <div class="detail-row"><span>Status</span><strong id="detailConditionRingkasan">{{ $badgeState[2] }}</strong></div>
+                    <div class="detail-row"><span>Pemeriksaan Terakhir</span><strong>{{ $latestHistory?->checked_at?->format('d F Y') ?? 'Belum ada pemeriksaan' }}</strong></div>
+                    <div class="detail-row"><span>Petugas</span><strong>{{ $latestHistory?->officer ?: 'Sarpras SIPIBS' }}</strong></div>
+                    <div class="detail-row"><span>Catatan</span><strong id="detailConditionCatatan">{{ $latestHistory?->notes ?: 'Tidak ada kerusakan' }}</strong></div>
                 </div>
             </div>
             <div class="condition-table-card detail-history-card">
@@ -92,12 +98,12 @@
                                 <table class="admin-table condition-table">
                     <thead><tr><th>Tanggal</th><th>Kondisi</th><th>Keterangan</th></tr></thead>
                     <tbody>
-                        @foreach(\['history'] as \)
+@foreach($item['history'] as $history)
                         <tr>
-                            <td>{{ \->checked_at->format('d F Y') }}</td>
-                            <td><span class="condition-badge {{ \->condition === 'rusak' ? 'red' : (\->condition === 'perlu_servis' ? 'yellow' : 'green') }}"><i class="bi bi-circle-fill"></i> {{ strtoupper(str_replace('_', ' ', \->condition)) }}</span></td>
+                            <td>{{ $history->checked_at?->format('d F Y') ?? '-' }}</td>
+                            <td><span class="condition-badge {{ $history->condition === 'rusak' ? 'red' : ($history->condition === 'perlu_servis' ? 'yellow' : 'green') }}"><i class="bi bi-circle-fill"></i> {{ strtoupper(str_replace('_', ' ', $history->condition)) }}</span></td>
                             
-                            <td>{{ \->notes }} (Petugas: {{ \->officer }})</td>
+                            <td>{{ $history->notes ?: '-' }}{{ $history->officer ? ' (Petugas: ' . $history->officer . ')' : '' }}</td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -113,19 +119,19 @@
     invToggle.addEventListener('click', function (e) { e.preventDefault(); invSub.classList.toggle('collapsed'); invToggle.classList.toggle('open', !invSub.classList.contains('collapsed')); localStorage.setItem('invOpen', invSub.classList.contains('collapsed') ? '0' : '1'); });
     invSub.querySelectorAll('.nav-sub-item').forEach(function(link) { link.addEventListener('click', function() { localStorage.setItem('invOpen', '1'); }); });
 
-    (function () {
-        const code = '{{ $selectedCode }}';
+(function () {
+        const code = @json($selectedCode);
         const databaseCondition = @json($inventoryItem?->condition ?? 'baik');
         function condState(cond) {
-            const c = String(cond || '').toUpperCase();
-            if (c.includes('RUSAK') && !c.includes('RINGAN')) return { label: 'RUSAK BERAT', status: 'red', ringkasan: 'Tidak Layak Pakai', catatan: 'Barang rusak, perlu perbaikan' };
-            if (c.includes('RUSAK')) return { label: 'RUSAK RINGAN', status: 'yellow', ringkasan: 'Kurang Layak', catatan: 'Barang mengalami kerusakan ringan' };
+            const c = String(cond || '').toUpperCase().replace(/_/g, ' ');
+            if (c.includes('RUSAK BERAT') || c === 'RUSAK') return { label: 'RUSAK BERAT', status: 'red', ringkasan: 'Tidak Layak Pakai', catatan: 'Barang rusak, perlu perbaikan' };
+            if (c.includes('RUSAK') || c.includes('SERVIS')) return { label: 'RUSAK RINGAN', status: 'yellow', ringkasan: 'Kurang Layak', catatan: 'Barang mengalami kerusakan ringan' };
             return { label: 'BAIK', status: 'green', ringkasan: 'Layak Pakai', catatan: 'Tidak ada kerusakan' };
         }
         let master = [];
         try { master = JSON.parse(localStorage.getItem('sipibsMasterItems') || '[]'); } catch (e) {}
-        const item = master.find(m => String(m.code).toUpperCase() === String(code).toUpperCase());
-        const state = condState(item ? item.condition : 'BAIK');
+        const item = code ? master.find(m => String(m.code).toUpperCase() === String(code).toUpperCase()) : null;
+        const state = condState(item ? item.condition : databaseCondition);
         const badge = document.getElementById('detailConditionBadge');
         if (badge) {
             badge.className = 'condition-badge ' + state.status;
