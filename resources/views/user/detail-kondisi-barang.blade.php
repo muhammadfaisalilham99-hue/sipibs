@@ -21,7 +21,7 @@
         'cat' => ($inventoryItem && isset($categoryNames[$inventoryItem->item_category_id])) ? $categoryNames[$inventoryItem->item_category_id] : 'Lainnya',
         'photo' => $inventoryItem ? $inventoryItem->photo : null,
         'history' => $inventoryItem ? $inventoryItem->conditionHistories : collect(),
-];
+    ];
     $selectedCode = $code;
     $latestHistory = $inventoryItem?->conditionHistories?->first();
     $badgeState = match ($inventoryItem?->condition) {
@@ -119,7 +119,7 @@
     invToggle.addEventListener('click', function (e) { e.preventDefault(); invSub.classList.toggle('collapsed'); invToggle.classList.toggle('open', !invSub.classList.contains('collapsed')); localStorage.setItem('invOpen', invSub.classList.contains('collapsed') ? '0' : '1'); });
     invSub.querySelectorAll('.nav-sub-item').forEach(function(link) { link.addEventListener('click', function() { localStorage.setItem('invOpen', '1'); }); });
 
-(function () {
+    (function () {
         const code = @json($selectedCode);
         const databaseCondition = @json($inventoryItem?->condition ?? 'baik');
         function condState(cond) {
